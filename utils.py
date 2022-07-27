@@ -8,7 +8,7 @@ def tsv2Json(input_text) -> dict:
 
     for row in rows:
         entry = {}
-        
+
         for header, value in zip(headers, row.split('\t')):
             entry[header] = value.strip()
         answer.append(entry)
@@ -22,16 +22,21 @@ def readLibrary(libraryFilename: str = 'library.tsv'):
 
 # returns the first book matching provided title from provided library
 # uses mkb79/audible-cli default naming scheme '$title $subtitle'
+
+
 def pullBook(library, name):
     for book in tsv2Json(readLibrary(library)):
-        if book['title'] + ' ' + book['subtitle'] == name: return book
-        if book['title'] == name: return book
+        if book['title'] + ' ' + book['subtitle'] == name:
+            return book
+        if book['title'] == name:
+            return book
 
 
 def nameFrom(file):
     name = file.replace('_', ' ')
     name, _, _ = name.partition('-')
     return name
+
 
 def titleFrom(book: dict):
     if book['subtitle'] == '':
