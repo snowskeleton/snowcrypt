@@ -1,6 +1,3 @@
-from asyncore import read
-
-
 def tsv2Json(input_text) -> dict:
     answer = []
 
@@ -25,9 +22,10 @@ def readLibrary(libraryFilename: str = 'library.tsv'):
 
 # returns the first book matching provided title from provided library
 # uses mkb79/audible-cli default naming scheme '$title $subtitle'
-def pullBook(library, title):
+def pullBook(library, name):
     for book in tsv2Json(readLibrary(library)):
-        if book['title'] + ' ' + book['subtitle'] == title: return book
+        if book['title'] + ' ' + book['subtitle'] == name: return book
+        if book['title'] == name: return book
 
 
 def nameFrom(file):
@@ -35,8 +33,7 @@ def nameFrom(file):
     name, _, _ = name.partition('-')
     return name
 
-
-# def metaDataFor(title):
-#     cleanTitle = nameFrom(title)
-
-    
+def titleFrom(book: dict):
+    if book['subtitle'] == '':
+        return book['title']
+    return book['title'] + ': ' + book['subtitle']

@@ -58,6 +58,12 @@ class MyTestCases(unittest.TestCase):
     from utils import nameFrom
     self.assertEqual(nameFrom("Some_Words_With_Underscors"), "Some Words With Underscors")
     self.assertEqual(nameFrom("Some_Words_Ending_With_A_Dash-thishsouldberemoved.aax"), "Some Words Ending With A Dash")
+  
+
+  def test_titleFrom(self):
+    from utils import titleFrom
+    self.assertEqual(titleFrom(SAMPLE_BOOK), SAMPLE_BOOK_TITLE)
+
 
   def test_tsv2json(self):
     from utils import tsv2Json

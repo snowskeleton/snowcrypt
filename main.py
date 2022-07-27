@@ -1,15 +1,25 @@
-# from parser import parse
 import ffmpeg
-from utils import tsv2Json
 from secretStuff import ACTIVATION_BYTES
-import sys
+from parser import parse
+from utils import *
 
 
-def convert(**kwargs):
-  stream = ffmpeg.input(kwargs['input'], activation_bytes=ACTIVATION_BYTES)
-  stream = ffmpeg.output(stream, kwargs['output'])
+def main():
+  input = parse.input()
+  name = nameFrom(input)
+  book = pullBook(parse.audible_cli_data(), name)
+  print(book)
+  title = titleFrom(book)
+
+  convert(parse.input(), f'{title}.{parse.extension()}')
+
+
+
+def convert(input: str, output: str, **kwargs):
+  stream = ffmpeg.input(input, activation_bytes=ACTIVATION_BYTES)
+  stream = ffmpeg.output(stream, output)
   stream = ffmpeg.overwrite_output(stream)
   stream.run()
 
 if __name__ == "__main__":
-  convert(sys.args[1:])
+  main()
