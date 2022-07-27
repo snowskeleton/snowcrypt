@@ -10,7 +10,7 @@ class MyTestCases(unittest.TestCase):
 
   def setUp(self) -> None:
     with open(self.library_filename, 'w+') as file:
-      file.write('')
+      file.write(SAMPLE_LIBRARY)
     with open(self.output_filename, 'w+') as file:
       file.write('')
       
@@ -24,16 +24,9 @@ class MyTestCases(unittest.TestCase):
     return super().tearDown()
 
 
-  def test_library(self):
-    from utils import readLibrary, pullBook
-    # make a known library.tsv file
-    with open(self.library_filename, 'w') as file:
-      file.write(SAMPLE_LIBRARY)
-    
+  def test_readLibrary(self):
+    from utils import readLibrary
     self.assertEqual(readLibrary(self.library_filename), SAMPLE_LIBRARY)
-
-    x = pullBook(self.library_filename, SAMPLE_TITLE)
-    self.assertTrue(x)
 
 
   def test_convert(self):
@@ -58,7 +51,16 @@ class MyTestCases(unittest.TestCase):
     from utils import nameFrom
     self.assertEqual(nameFrom("Some_Words_With_Underscors"), "Some Words With Underscors")
     self.assertEqual(nameFrom("Some_Words_Ending_With_A_Dash-thishsouldberemoved.aax"), "Some Words Ending With A Dash")
+
   
+  def test_pullBook(self):
+    from utils import pullBook
+    book = pullBook(self.library_filename, SAMPLE_TITLE)
+    print(book,"book")
+
+    self.assertTrue(book)
+    self.assertTrue(book['title'])
+
 
   def test_titleFrom(self):
     from utils import titleFrom
