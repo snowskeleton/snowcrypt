@@ -1,5 +1,4 @@
 import unittest
-import sys
 import os
 from tests.longStuff import *
 from moviepy.editor import AudioFileClip as a_clip
