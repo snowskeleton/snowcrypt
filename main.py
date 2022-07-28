@@ -8,7 +8,6 @@ def main():
     input = parse.input()
     name = nameFrom(input)
     book = pullBook(parse.audible_cli_data(), name)
-    print(book)
     title = titleFrom(book)
 
     convert(parse.input(), f'{title}.{parse.extension()}')

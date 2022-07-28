@@ -51,11 +51,11 @@ class MyTestCases(unittest.TestCase):
                          "Some Words With Underscors")
         self.assertEqual(nameFrom(
             "Some_Words_Ending_With_A_Dash-thishsouldberemoved.aax"), "Some Words Ending With A Dash")
+        self.assertEqual(nameFrom('only-remove-the-last-dash-junk junk.aax'), 'only-remove-the-last-dash')
 
     def test_pullBook(self):
         from utils import pullBook
         book = pullBook(self.library_filename, SAMPLE_TITLE)
-        print(book, "book")
 
         self.assertTrue(book)
         self.assertTrue(book['title'])

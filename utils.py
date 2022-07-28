@@ -25,7 +25,8 @@ def readLibrary(libraryFilename: str = 'library.tsv'):
 
 
 def pullBook(library, name):
-    for book in tsv2Json(readLibrary(library)):
+    lib = readLibrary(library)
+    for book in tsv2Json(lib):
         if book['title'] + ' ' + book['subtitle'] == name:
             return book
         if book['title'] == name:
@@ -34,8 +35,8 @@ def pullBook(library, name):
 
 def nameFrom(file):
     name = file.replace('_', ' ')
-    name, _, _ = name.partition('-')
-    return name
+    index = name.rfind(('-'))
+    return name[:index] if index != -1 else name
 
 
 def titleFrom(book: dict):
