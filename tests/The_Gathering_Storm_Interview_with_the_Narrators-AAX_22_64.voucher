@@ -1,0 +1,53 @@
+{
+    "content_license": {
+        "acr": "CR!X8MT39AV8X0VD1FZMEQBD41Y0WVV",
+        "asin": "B0036HZUZ4",
+        "content_metadata": {
+            "content_reference": {
+                "acr": "CR!X8MT39AV8X0VD1FZMEQBD41Y0WVV",
+                "asin": "B0036HZUZ4",
+                "content_format": "AAX_22_64",
+                "content_size_in_bytes": 5950605,
+                "file_version": "1",
+                "marketplace": "AF2M0KC94RCEA",
+                "sku": "FR_AREN_001030",
+                "tempo": "1.0",
+                "version": "2"
+            },
+            "content_url": {
+                "offline_url": "https://dze5l2jxnquy5.cloudfront.net/501ab1a955fb304d0bbfdd217e3cd220/fr_aren_001030_lc_64_22050_2.aax?id=6d2b4efd-4696-42d8-a73a-fb7f240376ae&Expires=1659727089&Signature=WZEBQKF0bEsYQxDPaF1xyVPgkr~eT9Y9fFG4h4~-hBbZmcuPHYSNMvo~XJxgALICRHZW31Qjo2bW62Lqk3yS-0d~WziM6BKGNBfuQV2QGv4mrlZifi~lno7oFAqLNxAcCh754NjGmInezkQFKV~OzvCiklP9sYuNNb2MSxPMIhN8-inPuJSBaVql6-MKelKvAAkl2c0HjgtZZ4M1dtmgw52~Z02W7CjnTzovy1kUPgUMoOP2VBUaOgRLzjiQYS0Ahfo3B6rplK-ZYksW3tPUYh-BV41IikCrGcB7S2WRChw-AkMK4lJug1vXqBO4HfxJV6-JRPhj4l-etP3dR6hp-w__&Key-Pair-Id=K13BOWPVA44D7"
+            },
+            "last_position_heard": {
+                "status": "DoesNotExist"
+            }
+        },
+        "drm_type": "Adrm",
+        "license_id": "6d2b4efd-4696-42d8-a73a-fb7f240376ae",
+        "license_response": {
+            "key": "edd4992ee4a03f8c83601b36468aa98b",
+            "iv": "866b1fdc9fdfee5675ea40264ab78ab5",
+            "rules": [
+                {
+                    "parameters": [
+                        {
+                            "expireDate": "3000-01-01T00:00:00Z",
+                            "type": "EXPIRES"
+                        }
+                    ],
+                    "name": "DefaultExpiresRule"
+                }
+            ]
+        },
+        "message": "Ownership: User [ARCM6F233RFGK] has [Purchase] rights.",
+        "request_id": "049a7cdc-3203-4bd4-9694-32e349efd8e9_83SQTYTRCCVEY0689MW6",
+        "requires_ad_supported_playback": false,
+        "status_code": "Granted",
+        "voucher_id": "cdn:049a7cdc-3203-4bd4-9694-32e349efd8e9_83SQTYTRCCVEY0689MW6"
+    },
+    "response_groups": [
+        "always-returned",
+        "last_position_heard",
+        "pdf_url",
+        "content_reference"
+    ]
+}
