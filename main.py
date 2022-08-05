@@ -14,10 +14,16 @@ def main():
 
 
 def convert(input: str, output: str, **kwargs):
+  stream = None
+  if '.aaxc' in input:
+    key = aaxcExtrasFrom(voucherFor(input))['aaxc_key']
+    iv = aaxcExtrasFrom(voucherFor(input))['aaxc_iv']
+    stream = ffmpeg.input(input, audible_key=key, audible_iv=iv)
+  else:
     stream = ffmpeg.input(input, activation_bytes=ACTIVATION_BYTES)
-    stream = ffmpeg.output(stream, output)
-    stream = ffmpeg.overwrite_output(stream)
-    stream.run()
+  stream = ffmpeg.output(stream, output, vframes=2)
+  stream = ffmpeg.overwrite_output(stream)
+  stream.run()
 
 
 if __name__ == "__main__":

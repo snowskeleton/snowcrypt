@@ -1,3 +1,6 @@
+import json
+
+
 def tsv2Json(input_text) -> dict:
     answer = []
 
@@ -7,6 +10,10 @@ def tsv2Json(input_text) -> dict:
     headers = rows.pop(0).split('\t')
 
     for row in rows:
+        # for some reason, nearly-empty rows like
+        # to sneak in occasionally. skip them.
+        if len(row) < 2:
+            continue
         entry = {}
 
         for header, value in zip(headers, row.split('\t')):
@@ -27,7 +34,7 @@ def readLibrary(libraryFilename: str = 'library.tsv'):
 def pullBook(library, name):
     lib = readLibrary(library)
     for book in tsv2Json(lib):
-        if book['title'] + ' ' + book['subtitle'] == name:
+        if f"{book['title']} {book['subtitle']}" == name:
             return book
         if book['title'] == name:
             return book
@@ -35,11 +42,25 @@ def pullBook(library, name):
 
 def nameFrom(file):
     name = file.replace('_', ' ')
-    index = name.rfind(('-'))
+    index = name.rfind('-')
     return name[:index] if index != -1 else name
+
+
+def voucherFor(file):
+    return f"{file.rsplit('.aaxc', 1)[0]}.voucher"
 
 
 def titleFrom(book: dict):
     if book['subtitle'] == '':
         return book['title']
     return book['title'] + ': ' + book['subtitle']
+
+
+def aaxcExtrasFrom(voucher):
+    print(voucher)
+    with open(voucher, 'r') as file:
+        answer = {}
+        voucherDict = json.loads(file.read())
+        answer['aaxc_key'] = voucherDict['content_license']['license_response']['key']
+        answer['aaxc_iv'] = voucherDict['content_license']['license_response']['iv']
+        return answer
