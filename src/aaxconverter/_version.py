@@ -1,0 +1,8 @@
+__author__ = "snowskeleton"
+__author_email__ = "isaac@snowskeleton.net"
+__description__ = "Convert AAX or AAXC files from Audible into MP3"
+__license__ = "Apache 2.0"
+__status__ = "Development"
+__title__ = "aaxconverter"
+__url__ = "https://github.com/snowskeleton/aaxconverter"
+__version__ = "0.0.0"

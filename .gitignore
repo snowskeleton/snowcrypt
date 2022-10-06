@@ -1,6 +1,12 @@
 .DS_STORE
 library.tsv
 secretStuff.py
+*.mp4
+*.m4*
+*.mp3
+*.aa*
+*.voucher
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
