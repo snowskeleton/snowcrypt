@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
 from src.aaxconverter import main
+import sys
 
-main.main()
+sys.exit(main.main())
