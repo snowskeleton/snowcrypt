@@ -37,13 +37,13 @@ def readLibrary(libraryFilename: str = 'library.tsv'):
 def pullBook(library, requestedTitle):
     for book in tsv2Json(readLibrary(library)):
         title = f"{book['title']} {book['subtitle']}"
-        if clean(title) == clean(requestedTitle):
+        if onlyAlpha(title) == onlyAlpha(requestedTitle):
             return book
-        if clean(book['title']) == clean(requestedTitle):
+        if onlyAlpha(book['title']) == onlyAlpha(requestedTitle):
             return book
 
 
-def clean(string):
+def onlyAlpha(string):
     return re.sub(r'[^a-zA-Z]', '', string)
 
 
