@@ -1,43 +1,24 @@
-from os import system
+import sys
+import os
 from .parser import arg
-from .utils import *
-from book import Book
+from .book import Book
+
+
+def signal_handler(sig, frame):
+    sys.exit(print('\naaxConverted: received SIGINT. exiting'))
 
 
 def main():
-  book = Book(arg('input'))
-  system(
-      f'ffmpeg -y -i "{book.input_filename}" -f ffmetadata "{book.metadata_filename}"')
-
-  from .update_chapter_titles import main
-  try:
-    main([
-        '--ffmeta', f'{book.metadata_filename}',
-        '--apimeta', f'{book.acli_metadata_filename}',
-        '--outfile', f'{book.updated_metadata_filename}',
-    ])
-  except:
-    pass  # above likes to crash after completing.
-
-  args = [
-      # different keys depending on .aax vs .aaxc
-      *book.keys,
-      ('-i', f'"{book.input_filename}"'),
-      # ('-f', f'ffmetadata'), ('-i', f'"{book.updated_metadata_filename}"'),
-      # audio and video (artwork) from audio
-      # ('-map', '0:a'), ('-map', '0:v'),
-      # metadata and chapters from metadata
-      # ('-map_metadata', '1'), ('-map_chapters', '1'),
-      ('-vframes 1', f'"{book.output_filename}"'),
-  ]
-
-  execute('ffmpeg -y -nostats ', args)
-  execute(
-      'mv -f', [(
-          f'"{book.output_filename}"',
-          f'"{book.final_filename}"',
-      )])
-  book.cleanup()
+    book = Book(arg('input'))
+    args = [
+        ('ffmpeg -loglevel quiet', f"-{arg('overwrite')}"),
+        *book.keys,
+        ('-i', f'"file:{book.filename}"'),
+        ('-c', 'copy'),
+        ('-hls_flags', 'temp_file'),
+        ('', os.path.join(arg('outputDir'), f'"{book.outputName}"')),
+    ]
+    os.system(' '.join([f'{arg[0]} {arg[1]}' for arg in args]))
 
 
 if __name__ == "__main__":

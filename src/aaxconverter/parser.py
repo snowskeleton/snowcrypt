@@ -1,15 +1,7 @@
 import argparse
-import os
 
 parser = argparse.ArgumentParser(description='Argument parser description')
 add = parser.add_argument
-add(
-    '--unattended', '-y',
-    dest='unattended',
-    action='store_true',
-    help='Use default option for all unset values',
-    default='',
-)
 add(
     '--activation-bytes', '-b',
     dest='abytes',
@@ -17,13 +9,19 @@ add(
     help='activation_bytes override',
     default='',
 )
+add('--dir', '-d',
+    dest='outputDir',
+    action='store',
+    default='.',
+    help='Directy in which to place the output file',
+    )
 add(
-    '--extension', '-e',
+    '--extension', '-e', '-f',
     dest='extension',
     action='store',
     type=str,
     help='The output format of your audio files',
-    default='mp3',
+    default='m4a',
 )
 add(
     '--input', '-i',
@@ -42,32 +40,11 @@ add(
     default='output',
 )
 add(
-    '--silent', '-s',
-    dest='silent',
-    action='store_true',
-    default=False,
-    help='Suppress stdout',
-)
-add(
-    '--library', '-l',
-    dest='library',
-    action='store',
-    help='library filename of "audible library export" output from mkb79/audible-cli',
-    default='library.tsv',
-)
-add(
-    '--config-file-path',
-    dest='config_file_path',
-    action='store',
-    default=os.path.expanduser('~/.aaxconverterrc'),
-    help='Custom aaxconverter config file path'
-)
-add(
-    '--add-chapters',
-    dest='add_chapters',
-    action='store_true',
-    default=False,
-    help='existence of mkb79/audible-cli generated chapters.json file'
+    '--overwrite',
+    dest='overwrite',
+    choices=['y', 'n'],
+    help='Use default option for all unset values',
+    default='y',
 )
 args = parser.parse_args()
 
