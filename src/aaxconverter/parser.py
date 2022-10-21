@@ -16,14 +16,6 @@ add('--dir', '-d',
     help='Directy in which to place the output file',
     )
 add(
-    '--extension', '-e', '-f',
-    dest='extension',
-    action='store',
-    type=str,
-    help='The output format of your audio files',
-    default='m4a',
-)
-add(
     '--input', '-i',
     dest='input',
     action='store',
