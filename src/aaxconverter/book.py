@@ -1,27 +1,36 @@
 import json
 from os import path
+from .tinytag import TinyTag
+from dataclasses import dataclass, field
 
 
+@dataclass
 class Book():
-    def __init__(self, filename) -> None:
-        self.filename = filename
-        self.outputName = "$(ffmpeg -hide_banner -loglevel quiet " + \
-            f"-i {filename} -f ffmetadata -|awk -F'=' -- " + \
-            "'/^title/ {print $2}' - | head -1 |sed 's/  / /' |sed 's/ (Unabridged)//').m4a"
-        if '.aaxc' in filename:
-            self.voucher = filename[:filename.rfind(
-                '.aaxc')] + '.voucher'
+
+    infile: str
+    outfile: str = field(init=False)
+    title: str = field(init=False)
+    keys: list = field(init=False)
+    voucher: str = field(init=False)
+    tags: TinyTag = field(init=False)
+
+    def __post_init__(self):
+        self.tags = TinyTag.get(self.infile, encoding='MP4')
+        self.outfile = f"{self.tags.title.replace(' (Unabridged)', '')}.m4a"
+        if '.aaxc' not in self.infile:
+            self.keys = [('-activation_bytes', f'"{bytes()}"')]
+            self.voucher = None
+        else:
+            self.voucher = self.infile.replace('.aaxc', '.voucher')
             if not path.exists(self.voucher):
                 raise FileNotFoundError(
-                    f"Expecting {self.filename} and {self.voucher} in same directory.")
+                    f"Oops, {self.infile} and {self.voucher} not together.")
 
             keys = self.aaxcExtrasFrom(self.voucher)
             self.keys = [
                 ('-audible_iv', keys['aaxc_iv']),
                 ('-audible_key', keys['aaxc_key']),
             ]
-        else:
-            self.keys = [('-activation_bytes', f'"{bytes()}"')]
 
     def aaxcExtrasFrom(self, voucher):
         with open(voucher, 'r') as file:

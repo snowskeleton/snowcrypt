@@ -1,6 +1,6 @@
 __author__ = "snowskeleton"
 __author_email__ = "isaac@snowskeleton.net"
-__description__ = "Convert AAX or AAXC files from Audible into MP3"
+__description__ = "Convert AAX or AAXC files from Audible into M4A"
 __license__ = "Apache 2.0"
 __status__ = "Development"
 __title__ = "aaxconverter"
