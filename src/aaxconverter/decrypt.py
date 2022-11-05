@@ -1,3 +1,4 @@
+#https://github.com/mkb79/Audible/issues/36
 import struct
 from Crypto.Cipher import AES
 import os
