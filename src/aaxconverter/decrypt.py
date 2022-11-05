@@ -1,5 +1,7 @@
 import struct
 from Crypto.Cipher import AES
+import os
+import sys
 
 
 class Translator:
