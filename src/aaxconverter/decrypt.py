@@ -291,8 +291,8 @@ class AaxDecrypter:
 
 
 def decrypt_local(inpath, outpath, key, iv):
-    with inpath.open('rb') as infile:
-        with outpath.open('wb') as outfile:
+    with open(inpath, 'rb') as infile:
+        with open(outpath, 'wb') as outfile:
             decrypter = AaxDecrypter(key, iv, inpath, outpath)
             decrypter.walk_atoms(Translator(), infile,
                                  outfile, decrypter.filesize)
