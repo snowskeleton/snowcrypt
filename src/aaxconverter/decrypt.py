@@ -94,7 +94,7 @@ class AaxDecrypter:
         self.iv = bytes.fromhex(iv)
         self.source = inpath
         self.dest = outpath
-        self.filesize = inpath.stat().st_size
+        self.filesize = os.path.getsize(inpath)
 
     def walk_ilst(self, translator, inStream, outStream, endPosition):  # cover extractor
         startPosition = inStream.tell()
