@@ -1,4 +1,4 @@
-#https://github.com/mkb79/Audible/issues/36
+#https://github.com/mkb79/Audible/issues/36, user BlindWanderer
 import struct
 from Crypto.Cipher import AES
 import os
