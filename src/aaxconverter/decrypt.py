@@ -97,38 +97,40 @@ class AaxDecrypter:
         self.dest = outpath
         self.filesize = os.path.getsize(inpath)
 
-    def walk_ilst(self, translator, inStream, outStream, endPosition):  # cover extractor
-        startPosition = inStream.tell()
-        while inStream.tell() < endPosition:
-            translator.reset()
-            self.status(inStream.tell(), self.filesize)
-            atomStart = inStream.tell()
-            atomLength = translator.readAtomSize(inStream)
-            atomEnd = atomStart + atomLength
-            atom = translator.readInt(inStream)
-            remaining = atomLength - translator.write_and_reset(outStream)
+    # def walk_ilst(self, translator, inStream, outStream, endPosition):  # cover extractor
+    #     startPosition = inStream.tell()
+    #     while inStream.tell() < endPosition:
+    #         translator.reset()
+    #         self.status(inStream.tell(), self.filesize)
+    #         atomStart = inStream.tell()
+    #         atomLength = translator.readAtomSize(inStream)
+    #         atomEnd = atomStart + atomLength
+    #         atom = translator.readInt(inStream)
+    #         remaining = atomLength - translator.write_and_reset(outStream)
 
-            if (atom == 0x636F7672):  # covr
-                #Going to assume ONE data atom per item.
-                dataLength = translator.readAtomSize(inStream)
-                translator.readInto(inStream, 12)
-                translator.skipInt()  # data
-                type = translator.getInt()  # type
-                translator.skipInt()  # zero?
-                remaining = remaining - translator.write_and_reset(outStream)
-                if type in self.filetypes:
-                    postfix = self.filetypes[type]
-                    with self.dest.with_suffix(".embedded-cover." + postfix).open('wb') as cover:
-                        remaining = remaining - \
-                            self.copy(inStream, remaining, outStream, cover)
+    #         if (atom == 0x636F7672):  # covr
+    #             #Going to assume ONE data atom per item.
+    #             # dataLength = translator.readAtomSize(inStream)
+    #             translator.readInto(inStream, 12)
+    #             translator.skipInt()  # data
+    #             # type = translator.getInt()  # type
+    #             translator.skipInt()  # zero?
+    #             remaining = remaining - translator.write_and_reset(outStream)
+    #             # if type in self.filetypes:
+    #             #     postfix = self.filetypes[type]
+    #             #     uk = self.dest.with_suffix(
+    #             #         ".embedded-cover." + postfix)
+    #             #     with open(uk, 'wb') as cover:
+    #             #         remaining = remaining - \
+    #             #             self.copy(inStream, remaining, outStream, cover)
 
-            if (remaining > 0):
-                walked = False
-                self.copy(inStream, remaining, outStream)
-            self.checkPosition(inStream, outStream, atomEnd)
+    #         if (remaining > 0):
+    #             walked = False
+    #             self.copy(inStream, remaining, outStream)
+    #         self.checkPosition(inStream, outStream, atomEnd)
 
-        self.status(inStream.tell(), self.filesize)
-        return endPosition - startPosition
+    #     self.status(inStream.tell(), self.filesize)
+    #     return endPosition - startPosition
 
     def walk_mdat(self, translator, inStream, outStream, endPosition):  # samples
         startPosition = inStream.tell()
@@ -219,11 +221,11 @@ class AaxDecrypter:
                 translator.zero(24, len)
                 remaining = remaining - \
                     translator.write_and_reset(outStream)
-            elif atom == 0x696C7374:  # ilst-0
-                remaining = remaining - translator.write_and_reset(outStream)
-                remaining = remaining - \
-                    self.walk_ilst(translator, inStream,
-                                   outStream, atomEnd)
+            # elif atom == 0x696C7374:  # ilst-0
+                # remaining = remaining - translator.write_and_reset(outStream)
+                # remaining = remaining - \
+                #     self.walk_ilst(translator, inStream,
+                #                    outStream, atomEnd)
             elif atom == 0x6d6f6f76 \
                     or atom == 0x7472616b \
                     or atom == 0x6d646961 \
