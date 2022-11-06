@@ -4,6 +4,8 @@ from Crypto.Cipher import AES
 import os
 import sys
 
+from .book import Book
+
 
 class Translator:
     fshort = (">h", 2)
@@ -90,12 +92,12 @@ class AaxDecrypter:
     filetypes = {6: "html", 7: "xml", 12: "gif",
                  13: "jpg", 14: "png", 15: "url", 27: "bmp"}
 
-    def __init__(self, key, iv, inpath, outpath):
-        self.key = bytes.fromhex(key)
-        self.iv = bytes.fromhex(iv)
-        self.source = inpath
-        self.dest = outpath
-        self.filesize = os.path.getsize(inpath)
+    def __init__(self, book):
+        self.key = bytes.fromhex(book.key)
+        self.iv = bytes.fromhex(book.iv)
+        self.source = book.infile
+        self.dest = book.outfile
+        self.filesize = os.path.getsize(book.infile)
 
     # def walk_ilst(self, translator, inStream, outStream, endPosition):  # cover extractor
     #     startPosition = inStream.tell()
@@ -195,7 +197,8 @@ class AaxDecrypter:
 
         return endPosition - startPosition
 
-    def walk_atoms(self, translator, inStream, outStream, endPosition):  # everything
+    def walk_atoms(self, inStream, outStream, endPosition):  # everything
+        translator = Translator()
         startPosition = inStream.tell()
         while inStream.tell() < endPosition:
             self.status(inStream.tell(), self.filesize)
@@ -293,9 +296,8 @@ class AaxDecrypter:
             print("IP: %d\tOP: %d\tP: %d" % (ip, op, position))
 
 
-def decrypt_local(inpath, outpath, key, iv):
-    with open(inpath, 'rb') as infile:
-        with open(outpath, 'wb') as outfile:
-            decrypter = AaxDecrypter(key, iv, inpath, outpath)
-            decrypter.walk_atoms(Translator(), infile,
-                                 outfile, decrypter.filesize)
+def decrypt_local(book: Book):
+    with open(book.infile, 'rb') as infile:
+        with open(book.outfile, 'wb') as outfile:
+            decrypter = AaxDecrypter(book)
+            decrypter.walk_atoms(infile, outfile, decrypter.filesize)

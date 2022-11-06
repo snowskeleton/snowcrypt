@@ -8,11 +8,14 @@ from dataclasses import dataclass, field
 class Book():
 
     infile: str
-    outfile: str = field(init=False)
-    title: str = field(init=False)
+    iv: str = field(init=False)
+    key: str = field(init=False)
     keys: list = field(init=False)
+    title: str = field(init=False)
+    outfile: str = field(init=False)
     voucher: str = field(init=False)
     tags: TinyTag = field(init=False)
+    description: str = field(init=False)
 
     def __post_init__(self):
         self.tags = TinyTag.get(self.infile, encoding='MP4')
@@ -27,9 +30,11 @@ class Book():
                     f"Oops, {self.infile} and {self.voucher} not together.")
 
             keys = self.aaxcExtrasFrom(self.voucher)
+            self.iv = keys['aaxc_iv']
+            self.key = keys['aaxc_key']
             self.keys = [
-                ('-audible_iv', keys['aaxc_iv']),
-                ('-audible_key', keys['aaxc_key']),
+                ('-audible_iv', self.iv),
+                ('-audible_key', self.key),
             ]
 
     def aaxcExtrasFrom(self, voucher):
