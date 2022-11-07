@@ -152,18 +152,18 @@ class AaxDecrypter:
             translator.skipInt()  # time in ms
             translator.skipInt()  # first block index
             translator.skipInt()  # trak number
-            bs = translator.getInt()  # total size of all blocks
-            bc = translator.getInt()  # number of blocks
+            totalBlockSize = translator.getInt()  # total size of all blocks
+            blockCount = translator.getInt()  # number of blocks
 
-            atomEnd = atomStart + atomLength + bs
+            atomEnd = atomStart + atomLength + totalBlockSize
 
             #next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
             if (atomType == 0x61617664):
                 translator.putInt(atomTypePosition, 0x6d703461)  # mp4a
-                translator.readInto(inStream, bc * 4)
+                translator.readInto(inStream, blockCount * 4)
                 translator.write(outStream)
-                for i in range(bc):
+                for i in range(blockCount):
                     self.status(inStream.tell(),  self.filesize)
                     sampleLength = translator.getInt()
                     # has to be reset every go round.
@@ -191,7 +191,8 @@ class AaxDecrypter:
             #    translator.reset()
             else:
                 len = translator.write_and_reset(outStream)
-                self.copy(inStream, atomLength + bs - len, outStream)
+                self.copy(inStream, atomLength +
+                          totalBlockSize - len, outStream)
             translator.reset()
             self.checkPosition(inStream, outStream, atomEnd)
 
