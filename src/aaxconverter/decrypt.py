@@ -163,7 +163,7 @@ class AaxDecrypter:
                 translator.putInt(atomTypePosition, 0x6d703461)  # mp4a
                 translator.readInto(inStream, blockCount * 4)
                 translator.write(outStream)
-                for i in range(blockCount):
+                for _ in range(blockCount):
                     self.status(inStream.tell(),  self.filesize)
                     sampleLength = translator.getInt()
                     # has to be reset every go round.
