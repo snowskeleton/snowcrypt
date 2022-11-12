@@ -40,6 +40,7 @@ except ImportError:
 from functools import reduce
 from io import BytesIO
 import aifc
+import base64
 import codecs
 import io
 import json
@@ -992,11 +993,19 @@ class Ogg(TinyTag):
                 continue
             if '=' in keyvalpair:
                 key, value = keyvalpair.split('=', 1)
-                if DEBUG:
-                    stderr('Found Vorbis Comment', key, value[:64])
-                fieldname = comment_type_to_attr_mapping.get(key.lower())
-                if fieldname:
-                    self._set_field(fieldname, value)
+                key_lowercase = key.lower()
+
+                if key_lowercase == "metadata_block_picture" and self._load_image:
+                    if DEBUG:
+                        stderr('Found Vorbis Image', key, value[:64])
+                    self._image_data = Flac._parse_image(
+                        BytesIO(base64.b64decode(value)))
+                else:
+                    if DEBUG:
+                        stderr('Found Vorbis Comment', key, value[:64])
+                    fieldname = comment_type_to_attr_mapping.get(key_lowercase)
+                    if fieldname:
+                        self._set_field(fieldname, value)
 
     def _parse_pages(self, fh):
         # for the spec, see: https://wiki.xiph.org/Ogg
@@ -1059,6 +1068,8 @@ class Wave(TinyTag):
         chunk_header = fh.read(8)
         while len(chunk_header) == 8:
             subchunkid, subchunksize = struct.unpack('4sI', chunk_header)
+            # IFF chunks are padded to an even number of bytes
+            subchunksize += subchunksize % 2
             if subchunkid == b'fmt ':
                 _, self.channels, self.samplerate = struct.unpack(
                     'HHI', fh.read(8))
@@ -1085,6 +1096,7 @@ class Wave(TinyTag):
                     field = sub_fh.read(4)
                     while len(field) == 4:
                         data_length = struct.unpack('I', sub_fh.read(4))[0]
+                        data_length += data_length % 2  # IFF chunks are padded to an even size
                         data = sub_fh.read(data_length).split(
                             b'\x00', 1)[0]  # strip zero-byte
                         fieldname = self.riff_mapping.get(field)
@@ -1092,8 +1104,6 @@ class Wave(TinyTag):
                             self._set_field(
                                 fieldname, codecs.decode(data, 'utf-8'))
                         field = sub_fh.read(4)
-                        if field[0:1] == b'\x00':  # sometimes an additional zero-byte is present
-                            field = field[1:] + sub_fh.read(1)
             elif subchunkid in (b'id3 ', b'ID3 ') and self._parse_tags:
                 id3 = ID3(fh, 0)
                 id3._parse_id3v2(fh)
@@ -1179,14 +1189,7 @@ class Flac(TinyTag):
                 oggtag._parse_vorbis_comment(fh)
                 self.update(oggtag)
             elif block_type == Flac.METADATA_PICTURE and self._load_image:
-                # https://xiph.org/flac/format.html#metadata_block_picture
-                pic_type, mime_len = struct.unpack('>2I', fh.read(8))
-                fh.read(mime_len)
-                description_len = struct.unpack('>I', fh.read(4))[0]
-                fh.read(description_len)
-                width, height, depth, colors, pic_len = struct.unpack(
-                    '>5I', fh.read(20))
-                self._image_data = fh.read(pic_len)
+                self._image_data = self._parse_image(fh)
             elif block_type >= 127:
                 return  # invalid block type
             else:
@@ -1197,6 +1200,17 @@ class Flac(TinyTag):
             if is_last_block:
                 return
             header_data = fh.read(4)
+
+    @staticmethod
+    def _parse_image(fh):
+        # https://xiph.org/flac/format.html#metadata_block_picture
+        pic_type, mime_len = struct.unpack('>2I', fh.read(8))
+        fh.read(mime_len)
+        description_len = struct.unpack('>I', fh.read(4))[0]
+        fh.read(description_len)
+        width, height, depth, colors, pic_len = struct.unpack(
+            '>5I', fh.read(20))
+        return fh.read(pic_len)
 
 
 class Wma(TinyTag):
