@@ -46,14 +46,14 @@ def pullKeyIVFrom(voucher):
 def deriveKeyIV(tags) -> str:
     _bytes = arg('bytes')
     hexbytes = bytes.fromhex(_bytes)
+    # derive key/iv for AES cipher
     im_key = crypt(fixedKey, hexbytes)
     iv = crypt(fixedKey, im_key, hexbytes)[:16]
     key = im_key[:16]
     cipher = AES.new(key, AES.MODE_CBC, iv=iv)
-    data = tags.adrmBlob
-    paddedData = pad16(data)
-    decryptedData = cipher.decrypt(paddedData)
-    fileBytes = bts(decryptedData[:4])
+    data = cipher.decrypt(pad16(tags.adrmBlob))
+    # make sure we're successful so far
+    fileBytes = bts(data[:4])
     calculatedChecksum = crypt(key, iv)
     try:
         assert calculatedChecksum == tags.checksum
@@ -61,13 +61,14 @@ def deriveKeyIV(tags) -> str:
     except:
         raise AssertionError('Either the activation bytes are incorrect'
                              ' or the audio file is invalid/corrupt.')
+    # if we didn't raise any exceptions, then this file can
+    # be decrypted with the provided activation_bytes
 
-    rawKey = decryptedData[8:24]
+    fileKey = data[8:24]
+    fileDrm = data[26:42]
+    inVect = crypt(fileDrm, fileKey, fixedKey)[:16]
 
-    bval = decryptedData[26:42]
-    inVect = crypt(bval, rawKey, fixedKey)[:16]
-
-    return bts(rawKey), bts(inVect)
+    return bts(fileKey), bts(inVect)
 
 
 def swapEndien(string: str):
