@@ -12,7 +12,7 @@ if sys.argv[-1] == "publish":
 
 here = pathlib.Path(__file__).parent
 long_description = (here / "README.md").read_text("utf-8")
-about = (here / "src" / "aaxconverter" / "_version.py").read_text("utf-8")
+about = (here / "src" / "snowcrypt" / "_version.py").read_text("utf-8")
 
 
 def read_from_file(key):
@@ -29,5 +29,5 @@ setup(name=read_from_file("__title__"),
       author=read_from_file("__author__"),
       author_email=read_from_file("__author_email__"),
       long_description_content_type="text/markdown",
-      packages=["aaxconverter"],
-      entry_points={"console_scripts": ["convert-aax = aaxconverter.main:main"]})
+      packages=["snowcrypt"],
+      entry_points={"console_scripts": ["snowcrypt = snowcrypt.main:main"]})
