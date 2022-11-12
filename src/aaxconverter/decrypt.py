@@ -198,8 +198,7 @@ class AaxDecrypter:
 
         return endPosition - startPosition
 
-    def walk_atoms(self, inStream, outStream, endPosition):  # everything
-        translator = Translator()
+    def walk_atoms(self, translator, inStream, outStream, endPosition):  # everything
         startPosition = inStream.tell()
         while inStream.tell() < endPosition:
             self.status(inStream.tell(), self.filesize)
@@ -301,4 +300,5 @@ def decrypt_local(book: Book):
     with open(book.infile, 'rb') as infile:
         with open(book.outfile, 'wb') as outfile:
             decrypter = AaxDecrypter(book)
-            decrypter.walk_atoms(infile, outfile, decrypter.filesize)
+            decrypter.walk_atoms(Translator(), infile,
+                                 outfile, decrypter.filesize)

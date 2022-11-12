@@ -3,8 +3,8 @@ import argparse
 parser = argparse.ArgumentParser(description='Argument parser description')
 add = parser.add_argument
 add(
-    '--activation-bytes', '-b',
-    dest='abytes',
+    '--bytes', '-b',
+    dest='bytes',
     action='store',
     help='activation_bytes override',
     default='',
@@ -16,8 +16,7 @@ add('--dir', '-d',
     help='Directy in which to place the output file',
     )
 add(
-    '--input', '-i',
-    dest='input',
+    'input',
     action='store',
     type=str,
     help='File to be converted',
