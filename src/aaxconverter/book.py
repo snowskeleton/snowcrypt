@@ -36,28 +36,23 @@ class Book():
 
 def pullKeyIVFrom(voucher):
     with open(voucher, 'r') as file:
-        voucherDict = json.loads(file.read())
-        key = voucherDict['content_license']['license_response']['key']
-        iv = voucherDict['content_license']['license_response']['iv']
+        license = json.loads(file.read())[
+            'content_license']['license_response']
+        key = license['key']
+        iv = license['iv']
         return key, iv
 
 
 def deriveKeyIV(tags) -> str:
-    adrmBlob = tags.adrmBlob
     _bytes = arg('bytes')
     hexbytes = bytes.fromhex(_bytes)
-
-    # This calculated checksum should be the same
-    # for every book downloaded from your Audible account.
     im_key = crypt(fixedKey, hexbytes)
     iv = crypt(fixedKey, im_key, hexbytes)[:16]
     key = im_key[:16]
-
     cipher = AES.new(key, AES.MODE_CBC, iv=iv)
-    # pad to nearest multiple of 16
-    length = 16 - (len(adrmBlob) % 16)
-    adrmBlob += bytes([length])*length
-    decryptedData = cipher.decrypt(adrmBlob)
+    data = tags.adrmBlob
+    paddedData = pad16(data)
+    decryptedData = cipher.decrypt(paddedData)
     fileBytes = bts(decryptedData[:4])
     calculatedChecksum = crypt(key, iv)
     try:
@@ -94,3 +89,8 @@ def crypt(*bits):
     for b in bits:
         sha.update(b)
     return sha.digest()
+
+
+def pad16(data):
+    length = 16 - (len(data) % 16)
+    return data + bytes([length])*length
