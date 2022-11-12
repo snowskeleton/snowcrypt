@@ -50,24 +50,23 @@ def deriveKeyIV(tags) -> str:
     # This calculated checksum should be the same
     # for every book downloaded from your Audible account.
     im_key = crypt(fixedKey, hexbytes)
-    im_iv = crypt(fixedKey, im_key, hexbytes)[:16]
-    im_key = im_key[:16]
-    calculatedChecksum = crypt(im_key, im_iv)
+    iv = crypt(fixedKey, im_key, hexbytes)[:16]
+    key = im_key[:16]
 
-    if calculatedChecksum != tags.checksum:
-        raise AssertionError('Computed checksum != file checksum. '
-                             'Either the activation bytes are incorrect, '
-                             'or the audio file is invalid/corrupt.')
-    cipher = AES.new(im_key, AES.MODE_CBC, iv=im_iv)
+    cipher = AES.new(key, AES.MODE_CBC, iv=iv)
     # pad to nearest multiple of 16
     length = 16 - (len(adrmBlob) % 16)
     adrmBlob += bytes([length])*length
     decryptedData = cipher.decrypt(adrmBlob)
     fileBytes = bts(decryptedData[:4])
-    if swapEndien(fileBytes) != _bytes:
-        raise Exception(
-            f'Unable to decrypt file with provided activation_bytes: {_bytes}'
-        )
+    calculatedChecksum = crypt(key, iv)
+    try:
+        assert calculatedChecksum == tags.checksum
+        assert swapEndien(fileBytes) == _bytes
+    except:
+        raise AssertionError('Either the activation bytes are incorrect'
+                             ' or the audio file is invalid/corrupt.')
+
     rawKey = decryptedData[8:24]
 
     bval = decryptedData[26:42]
@@ -77,7 +76,6 @@ def deriveKeyIV(tags) -> str:
 
 
 def swapEndien(string: str):
-    # adrmBlob is big endien, so we need to reverse it
     list = [*string]
     reversed = ''
     for _ in range(int(len(list)/2)):
@@ -88,8 +86,7 @@ def swapEndien(string: str):
 
 
 def bts(bytes: bytes) -> str:  # bytes to string
-    string = hexlify(bytes)
-    return str(string).strip("'")[2:]
+    return str(hexlify(bytes)).strip("'")[2:]
 
 
 def crypt(*bits):
