@@ -30,4 +30,6 @@ setup(name=read_from_file("__title__"),
       author_email=read_from_file("__author_email__"),
       long_description_content_type="text/markdown",
       packages=["snowcrypt"],
-      entry_points={"console_scripts": ["snowcrypt = snowcrypt.main:main"]})
+      requires=["pycryptodome"],
+      entry_points={"console_scripts": ["snowcrypt = snowcrypt.main:main"]},
+      )
