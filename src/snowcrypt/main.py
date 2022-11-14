@@ -32,7 +32,7 @@ def main():
         key = im_key[:16]
         # decrypt drm blob to prove we can do it
         cipher = AES.new(key, AES.MODE_CBC, iv=iv)
-        data = cipher.decrypt(overbyte(tags.adrmBlob, 16))
+        data = cipher.decrypt(pad(tags.adrmBlob, 16))
         try:
             assert crypt(key, iv) == tags.checksum
             assert swapEndien(bts(data[:4])) == _bytes
@@ -84,7 +84,7 @@ def crypt(*bits: bytes):
     return hashlib.sha1(b''.join(bits)).digest()
 
 
-def overbyte(data: bytes, length: int = 16) -> bytes:
+def pad(data: bytes, length: int = 16) -> bytes:
     l = length - (len(data) % length)
     return data + bytes([l])*l
 
