@@ -1,10 +1,8 @@
-#https://github.com/mkb79/Audible/issues/36, user BlindWanderer
+# https://github.com/mkb79/Audible/issues/36, user BlindWanderer
 import struct
 from Crypto.Cipher import AES
 import os
 import sys
-
-from .book import Book
 
 
 class Translator:
@@ -136,18 +134,18 @@ class AaxDecrypter:
 
     def walk_mdat(self, translator, inStream, outStream, endPosition):  # samples
         startPosition = inStream.tell()
-        #It's illegal for mdat to contain atoms... but that didn't stop Audible! Not that any parsers care.
+        # It's illegal for mdat to contain atoms... but that didn't stop Audible! Not that any parsers care.
         while inStream.tell() < endPosition:
             self.status(inStream.tell(), self.filesize)
-            #read an atom length.
+            # read an atom length.
             atomStart = inStream.tell()
             translator.reset()
             atomLength = translator.readAtomSize(inStream)
             atomTypePosition = translator.position()
             atomType = translator.readInt(inStream)
 
-            #after the atom type comes 5 additional fields describing the data.
-            #We only care about the last two.
+            # after the atom type comes 5 additional fields describing the data.
+            # We only care about the last two.
             translator.readInto(inStream, 20)
             translator.skipInt()  # time in ms
             translator.skipInt()  # first block index
@@ -157,7 +155,7 @@ class AaxDecrypter:
 
             atomEnd = atomStart + atomLength + totalBlockSize
 
-            #next come the atom specific fields
+            # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
             if (atomType == 0x61617664):
                 translator.putInt(atomTypePosition, 0x6d703461)  # mp4a
@@ -171,12 +169,12 @@ class AaxDecrypter:
                     remaining = sampleLength - \
                         outStream.write(cipher.decrypt(
                             inStream.read(sampleLength & 0xFFFFFFF0)))
-                    #fun fact, the last few bytes of each sample aren't encrypted!
+                    # fun fact, the last few bytes of each sample aren't encrypted!
                     if remaining > 0:
                         self.copy(inStream, remaining, outStream)
-            #there is no point in actually parsing this,
-            #we would need to rebuild the sample tables if we wanted to modify it.
-            #elif atomType == 0x74657874: #text
+            # there is no point in actually parsing this,
+            # we would need to rebuild the sample tables if we wanted to modify it.
+            # elif atomType == 0x74657874: #text
             #    translator.readInto(inStream, bc * 2)
             #    translator.write(outStream)
             #    for i in range(bc):
@@ -202,7 +200,7 @@ class AaxDecrypter:
         startPosition = inStream.tell()
         while inStream.tell() < endPosition:
             self.status(inStream.tell(), self.filesize)
-            #read an atom length.
+            # read an atom length.
             translator.reset()
             atomStart = inStream.tell()
             atomLength = translator.readAtomSize(inStream)
@@ -296,7 +294,7 @@ class AaxDecrypter:
             print("IP: %d\tOP: %d\tP: %d" % (ip, op, position))
 
 
-def decrypt_local(book: Book):
+def decrypt_local(book):
     with open(book.infile, 'rb') as infile:
         with open(book.outfile, 'wb') as outfile:
             decrypter = AaxDecrypter(book)
