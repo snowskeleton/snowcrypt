@@ -4,10 +4,11 @@ parser = argparse.ArgumentParser(description='Argument parser description')
 add = parser.add_argument
 add(
     '--bytes', '-b',
+    '--activation_bytes', '-activation_bytes',
     dest='bytes',
     action='store',
-    help='activation_bytes override',
-    default='',
+    help='activation bytes to decrypt AAX files',
+    default=None,
 )
 add('--dir', '-d',
     dest='outputDir',
