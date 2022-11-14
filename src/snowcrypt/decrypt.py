@@ -202,9 +202,7 @@ class AaxDecrypter:
             self.status(inStream.tell(), self.filesize)
             # read an atom length.
             translator.reset()
-            atomStart = inStream.tell()
-            atomLength = translator.readAtomSize(inStream)
-            atomEnd = atomStart + atomLength
+            atomLength, atomEnd = atomizer(inStream, translator)
             ap = translator.position()
             atom = translator.readInt(inStream)
 
@@ -213,12 +211,16 @@ class AaxDecrypter:
             if atom == 0x66747970:  # ftyp-none
                 remaining = remaining - translator.write_and_reset(outStream)
                 len = translator.readInto(inStream, remaining)
-                translator.putInt(0,  0x4D344120)  # "M4A "
-                translator.putInt(4,  0x00000200)  # version 2.0?
-                translator.putInt(8,  0x69736F32)  # "iso2"
-                translator.putInt(12, 0x4D344220)  # "M4B "
-                translator.putInt(16, 0x6D703432)  # "mp42"
-                translator.putInt(20, 0x69736F6D)  # "isom"
+                ints = [
+                    (0,  0x4D344120),  # "M4A "
+                    (4,  0x00000200),  # version 2.0?
+                    (8,  0x69736F32),  # "iso2"
+                    (12, 0x4D344220),  # "M4B "
+                    (16, 0x6D703432),  # "mp42"
+                    (20, 0x69736F6D),  # "isom"
+                ]
+                for loca, value in ints:
+                    translator.putInt(loca, value)
                 translator.zero(24, len)
                 remaining = remaining - \
                     translator.write_and_reset(outStream)
@@ -283,13 +285,11 @@ class AaxDecrypter:
         return length
 
     def write(self, buf, *outs) -> int:
-        for out in outs:
-            out.write(buf)
+        [out.write(buf) for out in outs]
         return len(buf)
 
     def checkPosition(self, inStream, outStream, position):
-        ip = inStream.tell()
-        op = outStream.tell()
+        ip, op = inStream.tell(), outStream.tell()
         if ip != op or ip != position:
             print("IP: %d\tOP: %d\tP: %d" % (ip, op, position))
 
@@ -300,3 +300,10 @@ def decrypt_local(infile, outfile, key, iv):
             decrypter = AaxDecrypter(infile, outfile, key, iv)
             decrypter.walk_atoms(Translator(), src,
                                  dest, decrypter.filesize)
+
+
+def atomizer(inStream, translator):
+    start = inStream.tell()
+    length = translator.readAtomSize(inStream)
+    end = start + length
+    return length, end

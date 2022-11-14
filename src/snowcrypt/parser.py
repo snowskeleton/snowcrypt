@@ -31,7 +31,7 @@ add(
     help='AES decryption key. Used instead of voucher or key derivation.',
     default=None
 )
-args, unknown = parser.parse_known_args()
+args, _ = parser.parse_known_args()
 
 
 def arg(key):
