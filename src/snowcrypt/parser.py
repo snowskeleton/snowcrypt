@@ -38,7 +38,7 @@ add(
     help='Use default option for all unset values',
     default='y',
 )
-args = parser.parse_args()
+args, unknown = parser.parse_args()
 
 
 def arg(key):
