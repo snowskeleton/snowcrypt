@@ -53,13 +53,6 @@ class TinyTagException(LookupError):  # inherit LookupError for backwards compat
     pass
 
 
-def _read(fh, nbytes):  # helper function to check if we haven't reached EOF
-    b = fh.read(nbytes)
-    if len(b) < nbytes:
-        raise TinyTagException('Unexpected end of file')
-    return b
-
-
 def stderr(*args):
     sys.stderr.write('%s\n' % ' '.join(repr(arg) for arg in args))
     sys.stderr.flush()
