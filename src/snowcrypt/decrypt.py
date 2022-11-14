@@ -90,12 +90,12 @@ class AaxDecrypter:
     filetypes = {6: "html", 7: "xml", 12: "gif",
                  13: "jpg", 14: "png", 15: "url", 27: "bmp"}
 
-    def __init__(self, book):
-        self.key = bytes.fromhex(book.key)
-        self.iv = bytes.fromhex(book.iv)
-        self.source = book.infile
-        self.dest = book.outfile
-        self.filesize = os.path.getsize(book.infile)
+    def __init__(self, infile, outfile, key, iv):
+        self.key = bytes.fromhex(key)
+        self.iv = bytes.fromhex(iv)
+        self.source = infile
+        self.dest = outfile
+        self.filesize = os.path.getsize(infile)
 
     # def walk_ilst(self, translator, inStream, outStream, endPosition):  # cover extractor
     #     startPosition = inStream.tell()
@@ -294,9 +294,9 @@ class AaxDecrypter:
             print("IP: %d\tOP: %d\tP: %d" % (ip, op, position))
 
 
-def decrypt_local(book):
-    with open(book.infile, 'rb') as infile:
-        with open(book.outfile, 'wb') as outfile:
-            decrypter = AaxDecrypter(book)
-            decrypter.walk_atoms(Translator(), infile,
-                                 outfile, decrypter.filesize)
+def decrypt_local(infile, outfile, key, iv):
+    with open(infile, 'rb') as src:
+        with open(outfile, 'wb') as dest:
+            decrypter = AaxDecrypter(infile, outfile, key, iv)
+            decrypter.walk_atoms(Translator(), src,
+                                 dest, decrypter.filesize)
