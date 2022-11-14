@@ -31,22 +31,17 @@
 
 
 from __future__ import division, print_function
-from chunk import Chunk
 from collections import OrderedDict, defaultdict
 try:
     from collections.abc import MutableMapping
 except ImportError:
     from collections import MutableMapping
-from functools import reduce
 from io import BytesIO
-import aifc
-import base64
 import codecs
 import io
 import json
 import operator
 import os
-import re
 import struct
 import sys
 
