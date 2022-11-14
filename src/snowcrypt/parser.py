@@ -17,6 +17,20 @@ add(
     help='File to be converted',
     default='',
 )
+add(
+    '--iv', '-i',
+    action='store',
+    type=str,
+    help='AES decryption initialization vector. Used instead of voucher or key derivation.',
+    default=None
+)
+add(
+    '--key', '-k',
+    action='store',
+    type=str,
+    help='AES decryption key. Used instead of voucher or key derivation.',
+    default=None
+)
 args, unknown = parser.parse_args()
 
 

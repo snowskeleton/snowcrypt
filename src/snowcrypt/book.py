@@ -18,12 +18,7 @@ class Book():
         self.title = tags.title.replace(' (Unabridged)', '')
         self.outfile = self.title + '.m4a'
 
-        try:
-            self.description = tags.extra['description']
-        except KeyError:
-            self.description = tags.comment
-
-        if '.aaxc' not in self.infile:
+        if '.aaxc' not in self.infile:  # aax instead
             self.key, self.iv = deriveKeyIV(tags)
         else:
             voucher = self.infile.replace('.aaxc', '.voucher')
