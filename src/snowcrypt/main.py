@@ -89,7 +89,3 @@ def crypt(*bits: bytes):
 def pad(data: bytes, length: int = 16) -> bytes:
     l = length - (len(data) % length)
     return data + bytes([l])*l
-
-
-if __name__ == "__main__":
-    main()
