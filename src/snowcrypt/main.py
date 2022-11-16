@@ -6,7 +6,7 @@ from os import path
 
 from Crypto.Cipher import AES
 
-from .decrypt import decrypt_local
+from .oldcrypt import decrypt_local
 from .localExceptions import *
 from .parser import arg
 from .tinytag import MP4
@@ -45,6 +45,8 @@ def main():
         fileDrm = data[26:42]
         inVect = crypt(fileDrm, fileKey, fixedKey)[:16]
         key, iv = bts(fileKey), bts(inVect)
+        if arg('bark'):
+            sys.exit(print(f'* key *\n{key}\n* iv *\n{iv}'))
 
     elif infile.endswith('.aaxc'):
         voucher = infile.replace('.aaxc', '.voucher')
