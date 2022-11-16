@@ -15,7 +15,7 @@ add(
     dest='bark',
     action='store_true',
     help='Print key and IV, then exit.',
-    default=False,
+    default=None,
 )
 add(
     'input',

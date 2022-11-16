@@ -68,8 +68,8 @@ def main():
     decrypt_local(
         infile,
         outfile,
-        arg('key') if arg('key') else key,
-        arg('iv') if arg('iv') else iv,
+        key if not arg('key') else arg('key'),
+        iv if not arg('iv') else arg('iv'),
     )
 
 
