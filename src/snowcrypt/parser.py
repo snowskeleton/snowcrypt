@@ -11,6 +11,13 @@ add(
     default=None,
 )
 add(
+    '--bark', '-B',
+    dest='bark',
+    action='store_true',
+    help='Print key and IV, then exit.',
+    default=False,
+)
+add(
     'input',
     action='store',
     type=str,
