@@ -63,6 +63,8 @@ def main():
             "The file you provided doesn't end with '.aax' or '.aaxc'." +
             "Please supply one that does.")
 
+    if arg('bark'):
+        sys.exit(print(f'* key *\n{key}\n* iv *\n{iv}'))
     decrypt_local(
         infile,
         outfile,
