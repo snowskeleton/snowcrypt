@@ -6,7 +6,6 @@ from .snowcrypt import decrypt_aaxc, deriveKeyIV
 from .localExceptions import *
 from .parser import arg
 from .tinytag import MP4
-import time
 
 fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
 
@@ -49,5 +48,3 @@ def main():
         key if not arg('key') else arg('key'),
         iv if not arg('iv') else arg('iv'),
     )
-    n = time.perf_counter()
-    print(n - x)
