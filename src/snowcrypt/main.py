@@ -6,6 +6,7 @@ from .snowcrypt import decrypt_aaxc, deriveKeyIV
 from .localExceptions import *
 from .parser import arg
 from .tinytag import MP4
+import time
 
 fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
 
@@ -42,12 +43,11 @@ def main():
             "The file you provided doesn't end with '.aax' or '.aaxc'. " +
             "Please supply one that does.")
 
-    key = key if not arg('key') else arg('key'),
-    iv = iv if not arg('iv') else arg('iv'),
-
     decrypt_aaxc(
         infile,
         outfile,
-        key,
-        iv,
+        key if not arg('key') else arg('key'),
+        iv if not arg('iv') else arg('iv'),
     )
+    n = time.perf_counter()
+    print(n - x)
