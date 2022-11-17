@@ -312,7 +312,7 @@ def _getKey(data: bytes):
     return data[8:24]
 
 
-def _getDrm(data):
+def _getDrm(data: bytes):
     """
     Args:
         data (bytes): decrypted adrmBlob
@@ -323,7 +323,7 @@ def _getDrm(data):
     return data[26:42]
 
 
-def _getAdrmBlob(inStream):
+def _getAdrmBlob(inStream: io.BufferedReader):
     """read ADRM from inStream
 
     Args:
@@ -336,7 +336,7 @@ def _getAdrmBlob(inStream):
     return inStream.read(56)
 
 
-def _getChecksum(inStream):
+def _getChecksum(inStream: io.BufferedReader):
     """read file checksum from inStream
 
     Args:
