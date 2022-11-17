@@ -1,8 +1,15 @@
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
 import struct
-from Crypto.Cipher import AES
 import os
-import sys
+import hashlib
+import io
+
+from Crypto.Cipher import AES
+from binascii import hexlify
+
+from .localExceptions import *
+
+fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
 
 
 class Translator:
@@ -232,8 +239,165 @@ class AaxDecrypter:
             print("IP: %d\tOP: %d\tP: %d" % (ip, op, position))
 
 
-def decrypt_local(infile, outfile, key, iv):
-    with open(infile, 'rb') as src:
-        with open(outfile, 'wb') as dest:
+def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
+    """
+    Converts inpath with key and iv, writing to outpath
+
+    Args:
+        inpath (str): source
+        outpath (str): destination
+        key (int): AES key
+        iv (int): AES initialization vector
+    """
+    with open(inpath, 'rb') as src:
+        with open(outpath, 'wb') as dest:
             decrypter = AaxDecrypter(src, dest, key, iv)
-            decrypter.walk_atoms(Translator(), os.path.getsize(infile))
+            decrypter.walk_atoms(Translator(), os.path.getsize(inpath))
+
+
+def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
+    """
+    convenience function for deriving key and initialization vector,
+    then decrypting with those values.
+
+    Args:
+        inpath (str): file path to input
+        outpath (str): file path to output
+        activation_bytes (str): decryption bytes unique to your account
+    """
+    with open(inpath, 'rb') as inStream:
+        key, iv = deriveKeyIV(inStream, activation_bytes)
+    decrypt_aaxc(inpath, outpath, key, iv)
+
+
+def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
+    """derive key and initialization vector for given io.BufferReader
+
+    Args:
+        inStream (io.BufferedReader): open file stream
+        activation_bytes (str): decryption bytes unique to your account
+
+    Returns:
+        int, int: key, initialization vector
+    """
+    _bytes = activation_bytes
+    im_key = _snowsha(fixedKey, bytes.fromhex(_bytes))
+    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))[:16]
+    key = im_key[:16]
+    # decrypt drm blob to prove we can do it
+    cipher = AES.new(key, AES.MODE_CBC, iv=iv)
+    data = cipher.decrypt(_pad(_getAdrmBlob(inStream), 16))
+    try:
+        assert _snowsha(key, iv) == _getChecksum(inStream)
+        assert _swapEndien(_bts(data[:4])) == _bytes
+    except:
+        raise CredentialMismatch('Either the activation bytes are incorrect'
+                                 ' or the audio file is invalid or corrupt.')
+    # if we didn't raise any exceptions, then this file can
+    # be decrypted with the provided activation_bytes
+    fileKey = _getKey(data)
+    fileDrm = _getDrm(data)
+    inVect = _snowsha(fileDrm, fileKey, fixedKey)[:16]
+    return _bts(fileKey), _bts(inVect)
+
+
+def _getKey(data: bytes):
+    """
+    Args:
+        data (bytes): decrypted adrmBlob
+
+    Returns:
+        bytes: final AES decryption key
+    """
+    return data[8:24]
+
+
+def _getDrm(data):
+    """
+    Args:
+        data (bytes): decrypted adrmBlob
+
+    Returns:
+        bytes: sha key derivation piece from drm blob
+    """
+    return data[26:42]
+
+
+def _getAdrmBlob(inStream):
+    """read ADRM from inStream
+
+    Args:
+        inStream (io.BufferReader): an open file stream
+
+    Returns:
+        int: adrm blob
+    """
+    inStream.seek(0x251)
+    return inStream.read(56)
+
+
+def _getChecksum(inStream):
+    """read file checksum from inStream
+
+    Args:
+        inStream (io.BufferReader): an open file stream
+
+    Returns:
+        int: checksum
+    """
+    inStream.seek(0x28d)
+    return inStream.read(20)
+
+
+def _swapEndien(string: str):
+    """
+    return given string of hex characters with swapped endian.
+    turns 12345678 into 78563412
+
+    Args:
+        string (str): hex string
+
+    Returns:
+        str: reversed string
+    """
+    return "".join(map(str.__add__, string[-2::-2], string[-1::-2]))
+
+
+def _bts(bytes: bytes) -> str:
+    """
+    convenience function for cleaning up values
+
+    Args:
+        bytes (bytes): bytes-like object we want as string
+
+    Returns:
+        str: stringy bytes
+    """
+    # turns "b'bytes'"" into "hexstring"
+    return str(hexlify(bytes)).strip("'")[2:]
+
+
+def _snowsha(*bits: bytes):
+    """
+    convenience function for deriving keys
+
+    Returns:
+        bytes: sha digest
+    """
+    return hashlib.sha1(b''.join(bits)).digest()
+
+
+def _pad(data: bytes, length: int = 16) -> bytes:
+    """
+    pad data to nearest length multiple
+
+    Argcs:
+        data (bytes): byte data
+        length (int, optional): Length to pad to. Defaults to 16.
+
+    Returns:
+        bytes: same bytes appended with N additional bytes of value N,
+        where N is len(data) modulus length
+    """
+    l = length - (len(data) % length)
+    return data + bytes([l])*l

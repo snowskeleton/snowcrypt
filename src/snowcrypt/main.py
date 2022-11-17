@@ -1,12 +1,8 @@
-import hashlib
 import json
 import sys
-from binascii import hexlify
 from os import path
 
-from Crypto.Cipher import AES
-
-from .decrypt import decrypt_local
+from .snowcrypt import decrypt_aaxc, deriveKeyIV
 from .localExceptions import *
 from .parser import arg
 from .tinytag import MP4
@@ -25,26 +21,9 @@ def main():
     outfile = title + '.m4a'
 
     if infile.endswith('.aax'):
-        # derive AES key and iv
         _bytes = arg('bytes')
-        im_key = crypt(fixedKey, bytes.fromhex(_bytes))
-        iv = crypt(fixedKey, im_key, bytes.fromhex(_bytes))[:16]
-        key = im_key[:16]
-        # decrypt drm blob to prove we can do it
-        cipher = AES.new(key, AES.MODE_CBC, iv=iv)
-        data = cipher.decrypt(pad(tags.adrmBlob, 16))
-        try:
-            assert crypt(key, iv) == tags.checksum
-            assert swapEndien(bts(data[:4])) == _bytes
-        except:
-            raise CredentialMismatch('Either the activation bytes are incorrect'
-                                     ' or the audio file is invalid or corrupt.')
-        # if we didn't raise any exceptions, then this file can
-        # be decrypted with the provided activation_bytes
-        fileKey = data[8:24]
-        fileDrm = data[26:42]
-        inVect = crypt(fileDrm, fileKey, fixedKey)[:16]
-        key, iv = bts(fileKey), bts(inVect)
+        with open(infile, 'rb') as f:
+            key, iv = deriveKeyIV(f, _bytes)
 
     elif infile.endswith('.aaxc'):
         voucher = infile.replace('.aaxc', '.voucher')
@@ -60,32 +39,15 @@ def main():
     else:
         raise NotDecryptable(
             str(infile) +
-            "The file you provided doesn't end with '.aax' or '.aaxc'." +
+            "The file you provided doesn't end with '.aax' or '.aaxc'. " +
             "Please supply one that does.")
 
-    if arg('bark'):
-        sys.exit(print(f'* key *\n{key}\n* iv *\n{iv}'))
-    decrypt_local(
+    key = key if not arg('key') else arg('key'),
+    iv = iv if not arg('iv') else arg('iv'),
+
+    decrypt_aaxc(
         infile,
         outfile,
-        key if not arg('key') else arg('key'),
-        iv if not arg('iv') else arg('iv'),
+        key,
+        iv,
     )
-
-
-def swapEndien(string: str):
-    return "".join(map(str.__add__, string[-2::-2], string[-1::-2]))
-
-
-def bts(bytes: bytes) -> str:
-    # turns "b'bytes'"" into "hexstring"
-    return str(hexlify(bytes)).strip("'")[2:]
-
-
-def crypt(*bits: bytes):
-    return hashlib.sha1(b''.join(bits)).digest()
-
-
-def pad(data: bytes, length: int = 16) -> bytes:
-    l = length - (len(data) % length)
-    return data + bytes([l])*l
