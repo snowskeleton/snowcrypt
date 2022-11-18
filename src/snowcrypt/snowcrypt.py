@@ -9,8 +9,6 @@ from binascii import hexlify
 
 from .localExceptions import *
 
-fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
-
 
 class Translator:
     fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
@@ -278,6 +276,7 @@ def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
     Returns:
         tuple[str, str]: key, initialization vector
     """
+    fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
     _bytes = activation_bytes
     im_key = _snowsha(fixedKey, bytes.fromhex(_bytes))
     iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))[:16]
