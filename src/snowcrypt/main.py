@@ -7,8 +7,6 @@ from .localExceptions import *
 from .parser import arg
 from .tinytag import MP4
 
-fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
-
 
 def signal_handler(sig, frame):
     sys.exit(print('\nsnowcrypt: received SIGINT. exiting'))
