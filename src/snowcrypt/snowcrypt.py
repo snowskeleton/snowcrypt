@@ -1,23 +1,24 @@
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
 import struct
-from Crypto.Cipher import AES
 import os
-import sys
+import hashlib
+import io
+
+from Crypto.Cipher import AES
+from binascii import hexlify
+
+from .localExceptions import CredentialMismatch
 
 
 class Translator:
-    fshort = (">h", 2)
-    fint = (">i", 4)
-    flong = (">q", 8)
+    fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
 
     def __init__(self, size=None):
         self.buf = bytearray(size if size != None else 4096)
-        self.pos = 0
-        self.wpos = 0
+        self.pos, self.wpos = 0, 0
 
     def reset(self):
-        self.pos = 0
-        self.wpos = 0
+        self.pos, self.wpos = 0, 0
 
     def position(self): return self.pos
     def getShort(self): return self.getOne(self.fshort)
@@ -70,9 +71,7 @@ class Translator:
 
     def readAtomSize(self, inStream):
         atomLength = self.readInt(inStream)
-        if (atomLength == 1):  # 64 bit atom!
-            atomLength = Translator.readLong(inStream)
-        return atomLength
+        return atomLength if atomLength != 1 else self.readLong(inStream)
 
     def zero(self, start=0, end=None):
         if end == None:
@@ -90,53 +89,19 @@ class AaxDecrypter:
     filetypes = {6: "html", 7: "xml", 12: "gif",
                  13: "jpg", 14: "png", 15: "url", 27: "bmp"}
 
-    def __init__(self, infile, outfile, key, iv):
+    def __init__(self, inStream, outStream, key, iv):
         self.key = bytes.fromhex(key)
         self.iv = bytes.fromhex(iv)
-        self.source = infile
-        self.dest = outfile
-        self.filesize = os.path.getsize(infile)
+        self.inStream = inStream
+        self.outStream = outStream
 
-    # def walk_ilst(self, translator, inStream, outStream, endPosition):  # cover extractor
-    #     startPosition = inStream.tell()
-    #     while inStream.tell() < endPosition:
-    #         translator.reset()
-    #         self.status(inStream.tell(), self.filesize)
-    #         atomStart = inStream.tell()
-    #         atomLength = translator.readAtomSize(inStream)
-    #         atomEnd = atomStart + atomLength
-    #         atom = translator.readInt(inStream)
-    #         remaining = atomLength - translator.write_and_reset(outStream)
-
-    #         if (atom == 0x636F7672):  # covr
-    #             #Going to assume ONE data atom per item.
-    #             # dataLength = translator.readAtomSize(inStream)
-    #             translator.readInto(inStream, 12)
-    #             translator.skipInt()  # data
-    #             # type = translator.getInt()  # type
-    #             translator.skipInt()  # zero?
-    #             remaining = remaining - translator.write_and_reset(outStream)
-    #             # if type in self.filetypes:
-    #             #     postfix = self.filetypes[type]
-    #             #     uk = self.dest.with_suffix(
-    #             #         ".embedded-cover." + postfix)
-    #             #     with open(uk, 'wb') as cover:
-    #             #         remaining = remaining - \
-    #             #             self.copy(inStream, remaining, outStream, cover)
-
-    #         if (remaining > 0):
-    #             walked = False
-    #             self.copy(inStream, remaining, outStream)
-    #         self.checkPosition(inStream, outStream, atomEnd)
-
-    #     self.status(inStream.tell(), self.filesize)
-    #     return endPosition - startPosition
-
-    def walk_mdat(self, translator, inStream, outStream, endPosition):  # samples
+    def walk_mdat(self, translator, endPosition):  # samples
+        inStream = self.inStream
+        outStream = self.outStream
         startPosition = inStream.tell()
         # It's illegal for mdat to contain atoms... but that didn't stop Audible! Not that any parsers care.
         while inStream.tell() < endPosition:
-            self.status(inStream.tell(), self.filesize)
+            # self.status(inStream.tell(), self.filesize)
             # read an atom length.
             atomStart = inStream.tell()
             translator.reset()
@@ -162,7 +127,7 @@ class AaxDecrypter:
                 translator.readInto(inStream, blockCount * 4)
                 translator.write(outStream)
                 for _ in range(blockCount):
-                    self.status(inStream.tell(),  self.filesize)
+                    # self.status(inStream.tell(),  self.filesize)
                     sampleLength = translator.getInt()
                     # has to be reset every go round.
                     cipher = AES.new(self.key, AES.MODE_CBC, iv=self.iv)
@@ -172,37 +137,26 @@ class AaxDecrypter:
                     # fun fact, the last few bytes of each sample aren't encrypted!
                     if remaining > 0:
                         self.copy(inStream, remaining, outStream)
-            # there is no point in actually parsing this,
-            # we would need to rebuild the sample tables if we wanted to modify it.
-            # elif atomType == 0x74657874: #text
-            #    translator.readInto(inStream, bc * 2)
-            #    translator.write(outStream)
-            #    for i in range(bc):
-            #        sampleLength = translator.getShort()
-            #        t2 = Translator(sampleLength * 2)
-            #        t2.readInto(inStream, sampleLength)
-            #        t2.getString(sampleLength)
-            #        before = t2.readCount()
-            #        encdSize = t2.readAtomSize(inStream)#encd atom size
-            #        t2.readInto(inStream, encdSize + before - translator.readCount())
-            #        t2.write(outStream)
-            #    translator.reset()
             else:
                 len = translator.write_and_reset(outStream)
                 self.copy(inStream, atomLength +
                           totalBlockSize - len, outStream)
             translator.reset()
-            self.checkPosition(inStream, outStream, atomEnd)
+            self.checkPosition(atomEnd)
 
         return endPosition - startPosition
 
-    def walk_atoms(self, translator, inStream, outStream, endPosition):  # everything
+    def walk_atoms(self, translator, endPosition):  # everything
+        inStream = self.inStream
+        outStream = self.outStream
         startPosition = inStream.tell()
         while inStream.tell() < endPosition:
-            self.status(inStream.tell(), self.filesize)
+            # self.status(inStream.tell(), self.filesize)
             # read an atom length.
             translator.reset()
-            atomLength, atomEnd = atomizer(inStream, translator)
+            atomStart = inStream.tell()
+            atomLength = translator.readAtomSize(inStream)
+            atomEnd = atomStart + atomLength
             ap = translator.position()
             atom = translator.readInt(inStream)
 
@@ -211,24 +165,15 @@ class AaxDecrypter:
             if atom == 0x66747970:  # ftyp-none
                 remaining = remaining - translator.write_and_reset(outStream)
                 len = translator.readInto(inStream, remaining)
-                ints = [
-                    (0,  0x4D344120),  # "M4A "
-                    (4,  0x00000200),  # version 2.0?
-                    (8,  0x69736F32),  # "iso2"
-                    (12, 0x4D344220),  # "M4B "
-                    (16, 0x6D703432),  # "mp42"
-                    (20, 0x69736F6D),  # "isom"
-                ]
-                for loca, value in ints:
-                    translator.putInt(loca, value)
+                translator.putInt(0,  0x4D344120)  # "M4A "
+                translator.putInt(4,  0x00000200)  # version 2.0?
+                translator.putInt(8,  0x69736F32)  # "iso2"
+                translator.putInt(12, 0x4D344220)  # "M4B "
+                translator.putInt(16, 0x6D703432)  # "mp42"
+                translator.putInt(20, 0x69736F6D)  # "isom"
                 translator.zero(24, len)
                 remaining = remaining - \
                     translator.write_and_reset(outStream)
-            # elif atom == 0x696C7374:  # ilst-0
-                # remaining = remaining - translator.write_and_reset(outStream)
-                # remaining = remaining - \
-                #     self.walk_ilst(translator, inStream,
-                #                    outStream, atomEnd)
             elif atom == 0x6d6f6f76 \
                     or atom == 0x7472616b \
                     or atom == 0x6d646961 \
@@ -237,27 +182,23 @@ class AaxDecrypter:
                     or atom == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
                 remaining = remaining - translator.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_atoms(translator, inStream,
-                                    outStream, atomEnd)
+                    self.walk_atoms(translator, atomEnd)
             elif atom == 0x6D657461:  # meta-4
                 translator.readInto(inStream, 4)
                 remaining = remaining - \
                     translator.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_atoms(translator, inStream,
-                                    outStream, atomEnd)
+                    self.walk_atoms(translator, atomEnd)
             elif atom == 0x73747364:  # stsd-8
                 translator.readInto(inStream, 8)
                 remaining = remaining - \
                     translator.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_atoms(translator, inStream,
-                                    outStream, atomEnd)
+                    self.walk_atoms(translator, atomEnd)
             elif atom == 0x6d646174:  # mdat-none
                 remaining = remaining - translator.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_mdat(translator, inStream,
-                                   outStream, atomEnd)
+                    self.walk_mdat(translator, atomEnd)
             elif atom == 0x61617664:  # aavd-variable
                 translator.putInt(ap, 0x6d703461)  # mp4a
                 remaining = remaining - \
@@ -269,9 +210,9 @@ class AaxDecrypter:
                 # don't care about the children.
                 self.copy(inStream, remaining, outStream)
 
-            self.checkPosition(inStream, outStream, atomEnd)
+            self.checkPosition(atomEnd)
 
-        self.status(inStream.tell(), self.filesize)
+        # self.status(inStream.tell(), self.filesize)
         return endPosition - startPosition
 
     def status(self, position, filesize):
@@ -285,25 +226,175 @@ class AaxDecrypter:
         return length
 
     def write(self, buf, *outs) -> int:
-        [out.write(buf) for out in outs]
+        for out in outs:
+            out.write(buf)
         return len(buf)
 
-    def checkPosition(self, inStream, outStream, position):
-        ip, op = inStream.tell(), outStream.tell()
+    def checkPosition(self, position):
+        ip = self.inStream.tell()
+        op = self.outStream.tell()
         if ip != op or ip != position:
             print("IP: %d\tOP: %d\tP: %d" % (ip, op, position))
 
 
-def decrypt_local(infile, outfile, key, iv):
-    with open(infile, 'rb') as src:
-        with open(outfile, 'wb') as dest:
-            decrypter = AaxDecrypter(infile, outfile, key, iv)
-            decrypter.walk_atoms(Translator(), src,
-                                 dest, decrypter.filesize)
+def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
+    """converts inpath with key and iv, writing to outpath
+
+    Args:
+        inpath (str): source
+        outpath (str): destination
+        key (int): AES key
+        iv (int): AES initialization vector
+    """
+    with open(inpath, 'rb') as src:
+        with open(outpath, 'wb') as dest:
+            decrypter = AaxDecrypter(src, dest, key, iv)
+            decrypter.walk_atoms(Translator(), os.path.getsize(inpath))
 
 
-def atomizer(inStream, translator):
-    start = inStream.tell()
-    length = translator.readAtomSize(inStream)
-    end = start + length
-    return length, end
+def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
+    """convenience function for deriving AES key and initialization vector,
+    then decrypting with those values.
+
+    Args:
+        inpath (str): file path to input
+        outpath (str): file path to output
+        activation_bytes (str): decryption bytes unique to your account
+    """
+    with open(inpath, 'rb') as inStream:
+        key, iv = deriveKeyIV(inStream, activation_bytes)
+    decrypt_aaxc(inpath, outpath, key, iv)
+
+
+def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
+    """derive key and initialization vector for given io.BufferReader
+
+    Args:
+        inStream (io.BufferedReader): open file stream
+        activation_bytes (str): decryption bytes unique to your account
+
+    Returns:
+        tuple[str, str]: key, initialization vector
+    """
+    fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
+    _bytes = activation_bytes
+    im_key = _snowsha(fixedKey, bytes.fromhex(_bytes))
+    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))[:16]
+    key = im_key[:16]
+    # decrypt drm blob to prove we can do it
+    cipher = AES.new(key, AES.MODE_CBC, iv=iv)
+    data = cipher.decrypt(_pad(_getAdrmBlob(inStream), 16))
+    try:
+        assert _snowsha(key, iv) == _getChecksum(inStream)
+        assert _swapEndien(_bts(data[:4])) == _bytes
+    except AssertionError:
+        raise CredentialMismatch('Either the activation bytes are incorrect'
+                                 ' or the audio file is invalid or corrupt.')
+    # if we didn't raise any exceptions, then this file can
+    # be decrypted with the provided activation_bytes
+    fileKey = _getKey(data)
+    fileDrm = _getDrm(data)
+    inVect = _snowsha(fileDrm, fileKey, fixedKey)[:16]
+    return _bts(fileKey), _bts(inVect)
+
+
+def _getKey(data: bytes):
+    """
+    Args:
+        data (bytes): decrypted adrmBlob
+
+    Returns:
+        bytes: final AES decryption key
+    """
+    return data[8:24]
+
+
+def _getDrm(data: bytes):
+    """
+    Args:
+        data (bytes): decrypted adrmBlob
+
+    Returns:
+        bytes: sha key derivation piece from drm blob
+    """
+    return data[26:42]
+
+
+def _getAdrmBlob(inStream: io.BufferedReader):
+    """read ADRM from inStream
+
+    Args:
+        inStream (io.BufferReader): an open file stream
+
+    Returns:
+        int: adrm blob
+    """
+    inStream.seek(0x251)
+    return inStream.read(56)
+
+
+def _getChecksum(inStream: io.BufferedReader):
+    """read file checksum from inStream
+
+    Args:
+        inStream (io.BufferReader): an open file stream
+
+    Returns:
+        int: checksum
+    """
+    inStream.seek(0x28d)
+    return inStream.read(20)
+
+
+def _swapEndien(string: str):
+    """return bytes-like string with swapped endian
+    turns 12345678 into 78563412
+
+    Args:
+        string (str): hex string
+
+    Returns:
+        str: reversed string
+    """
+    return "".join(map(str.__add__, string[-2::-2], string[-1::-2]))
+
+
+def _bts(bytes: bytes) -> str:
+    """convenience function for cleaning up values
+
+    Args:
+        bytes (bytes): bytes-like object we want as string
+
+    Returns:
+        str: stringy bytes
+    """
+    # turns "b'bytes'"" into "hexstring"
+    return str(hexlify(bytes)).strip("'")[2:]
+
+
+def _snowsha(*bits: bytes, length: int = None):
+    """convenience function for deriving keys
+
+    Args:
+        bits (bytes): input data for sha hash
+        length (int, optional): return only first length characters. Defaults to None (which is All)
+
+    Returns:
+        bytes: sha digest
+    """
+    return hashlib.sha1(b''.join(bits)).digest()[:length]
+
+
+def _pad(data: bytes, length: int = 16) -> bytes:
+    """pad data to nearest length multiple
+
+    Args:
+        data (bytes): byte data
+        length (int, optional): Length to pad to. Defaults to 16
+
+    Returns:
+        bytes: same bytes appended with N additional bytes of value N,
+        where N is len(data) modulus length
+    """
+    length = length - (len(data) % length)
+    return data + bytes([length])*length
