@@ -122,7 +122,7 @@ class AaxDecrypter:
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
-            if (atomType == 0x61617664):
+            if (atomType == 0x61617664):  # aavd
                 translator.putInt(atomTypePosition, 0x6d703461)  # mp4a
                 translator.readInto(inStream, blockCount * 4)
                 translator.write(outStream)
