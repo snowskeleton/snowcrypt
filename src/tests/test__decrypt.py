@@ -1,6 +1,6 @@
 import unittest
 from ..snowcrypt.snowcrypt import decrypt_aax, decrypt_aaxc, deriveKeyIV
-from ..snowcrypt.newcrypt import decrypt_local as newcrypt
+from ..snowcrypt.decrypt import decrypt_local as oldcrypt
 import time
 
 
@@ -9,19 +9,47 @@ class MyTestCases(unittest.TestCase):
   def test__decrypt_local(self):
     elap = []
 
+    def makeADict():
+      someDict = {'key': 'value'}
+      for i in range(100000000):
+        someDict[i] = 'literally any value'
+      return someDict
+
+    someDict = makeADict()
+
+    def dicty():
+      someDict['key']
+
+    def iffy():
+      if 'some string' == 'some  string' \
+              or 1 == 2 \
+              or -2 == 2 \
+              or 1 == 4 \
+              or 1 == 7 \
+              or 1 == 12 \
+              or 1 == 9 \
+              or 1 == 5 \
+              or 1 == 6:
+        pass
+
     def oneHundo(func, args: list, times: int):
       for _ in range(times):
-        start = time.time()
+        start = time.perf_counter_ns()
         func(*args)
-        end = time.time()
+        end = time.perf_counter_ns()
         elap.append(end - start)
       return sum(elap) / len(elap)
 
-    # y = oneHundo(oldcrypt, StormAAX, 2)
-    x = oneHundo(newcrypt, StormAAX, 1)
-    # x = oneHundo(decrypt_local, EsperoAAX, 3)
-    # self.assertEqual(x, y)
-    self.assertLess(x, 0)
+    n = oneHundo(iffy, [], 100)
+    p = oneHundo(dicty, [], 100)
+    print('if  : ', n)
+    print('dict: ', p)
+    # # y = oneHundo(oldcrypt, StormAAX, 2)
+    # x = oneHundo(decrypt_aaxc, StormAAX, 10)
+    # y = oneHundo(oldcrypt, StormAAX, 10)
+    # # self.assertEqual(x, y)
+    # print('new: ', x)
+    # print('old: ', y)
     # self.assertLess(x, r)
 
 
