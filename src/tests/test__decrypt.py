@@ -1,4 +1,3 @@
-import asyncio
 import unittest
 from ..snowcrypt.snowcrypt import decrypt_aaxc as newcrypt
 from ..snowcrypt.oldcrypt import decrypt_aaxc as oldcrypt
@@ -6,61 +5,57 @@ import time
 
 
 def avg(list: list):
-  return sum(list) / len(list)
+    return sum(list) / len(list)
 
 
 def now():
-  return time.perf_counter_ns()
+    return time.perf_counter_ns()
+
+
+def _some(func, args: list):
+    start = now()
+    func(*args)
+    end = now()
+    return end - start
+
+
+def race(funcs: list[dict], laps: int):
+    elap = []
+    elap2 = []
+    one = funcs[0]
+    two = funcs[1]
+
+    for _ in range(laps):
+        elap.append(_some(one['func'], one['args']))
+        elap2.append(_some(two['func'], two['args']))
+
+    return avg(elap), avg(elap2)
+
 
 class MyTestCases(unittest.TestCase):
+    def test__decrypt_local(self):
 
-  def test__decrypt_local(self):
-    elap = []
-
-    # def makeADict():
-    #   someDict = {'key': 'value'}
-    #   for i in range(100000000):
-    #     someDict[i] = 'literally any value'
-    #   return someDict
-
-    # someDict = makeADict()
-
-    # def dicty():
-    #   someDict['key']
-
-    # def iffy():
-    #   if 'some string' == 'some  string' \
-    #           or 1 == 2 \
-    #           or -2 == 2 \
-    #           or 1 == 4 \
-    #           or 1 == 7 \
-    #           or 1 == 12 \
-    #           or 1 == 9 \
-    #           or 1 == 5 \
-    #           or 1 == 6:
-    #     pass
-    # n = oneHundo(iffy, [], 100)
-    # p = oneHundo(dicty, [], 100)
-    # print('if  : ', n)
-    # print('dict: ', p)
-    # # y = oneHundo(oldcrypt, StormAAX, 2)
-
-    def batch(func, args: list, times: int):
-      for _ in range(times):
-        start = now()
-        func(*args)
-        end = now()
-        elap.append(end - start)
-      return avg(elap)
-
-    x = batch(newcrypt, StormAAX, 20)
-    y = batch(oldcrypt, StormAAX, 20)
-    print('new: ', x)
-    print('old: ', y)
+        contestents = [
+            {
+                # 'func': oldcrypt,
+                'func': newcrypt,
+                'args': StormAAXC,
+                # 'args': EsperoAAX,
+            },
+            {
+                'func': oldcrypt,
+                # 'func': newcrypt,
+                'args': StormAAXC,
+                # 'args': EsperoAAX,
+            }
+        ]
+        one, two = race(contestents, 5)
+        print('new: ', str(one)[:3])
+        print('old: ', str(two)[:3])
 
 
 def main():
-  MyTestCases().test__decrypt_local()
+    MyTestCases().test__decrypt_local()
 
 
 StormAAXC = [

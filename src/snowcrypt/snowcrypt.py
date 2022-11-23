@@ -1,3 +1,4 @@
+import sys
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
 import struct
 import os
@@ -98,10 +99,7 @@ class AaxDecrypter:
         inStream = self.inStream
         outStream = self.outStream
         startPosition = inStream.tell()
-        # It's illegal for mdat to contain atoms... but that didn't stop Audible! Not that any parsers care.
         while inStream.tell() < endPosition:
-            # read an atom length.
-            atomStart = inStream.tell()
             translator.reset()
             atomLength = translator.readAtomSize(inStream)
             atomTypePosition = translator.position()
@@ -116,11 +114,9 @@ class AaxDecrypter:
             totalBlockSize = translator.getInt()  # total size of all blocks
             blockCount = translator.getInt()  # number of blocks
 
-            atomEnd = atomStart + atomLength + totalBlockSize
-
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
-            if (atomType == 0x61617664):  # aavd
+            if atomType == 0x61617664:  # aavd
                 translator.putInt(atomTypePosition, 0x6d703461)  # mp4a
                 translator.readInto(inStream, blockCount * 4)
                 translator.write(outStream)
@@ -151,14 +147,12 @@ class AaxDecrypter:
             translator.reset()
             atomStart = inStream.tell()
             atomLength = translator.readAtomSize(inStream)
-            atomEnd = atomStart + atomLength
-            ap = translator.position()
             atom = translator.readInt(inStream)
 
             remaining = atomLength
 
             if atom == 0x66747970:  # ftyp-none
-                remaining = remaining - translator.write_and_reset(outStream)
+                remaining -= translator.write_and_reset(outStream)
                 len = translator.readInto(inStream, remaining)
                 translator.putInt(0,  0x4D344120)  # "M4A "
                 translator.putInt(4,  0x00000200)  # version 2.0?
@@ -167,10 +161,7 @@ class AaxDecrypter:
                 translator.putInt(16, 0x6D703432)  # "mp42"
                 translator.putInt(20, 0x69736F6D)  # "isom"
                 translator.zero(24, len)
-                remaining = remaining - \
-                    translator.write_and_reset(outStream)
-
-
+                remaining -= translator.write_and_reset(outStream)
 
             elif atom == 0x6d6f6f76 \
                     or atom == 0x7472616b \
@@ -180,38 +171,18 @@ class AaxDecrypter:
                     or atom == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
                 remaining = remaining - translator.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_atoms(translator, atomEnd)
-            elif atom == 0x6D657461:  # meta-4
-                translator.readInto(inStream, 4)
-                remaining = remaining - \
-                    translator.write_and_reset(outStream)
-                remaining = remaining - \
-                    self.walk_atoms(translator, atomEnd)
-            elif atom == 0x73747364:  # stsd-8
-                translator.readInto(inStream, 8)
-                remaining = remaining - \
-                    translator.write_and_reset(outStream)
-                remaining = remaining - \
-                    self.walk_atoms(translator, atomEnd)
+                    self.walk_atoms(translator, atomStart + atomLength)
             elif atom == 0x6d646174:  # mdat-none
                 remaining = remaining - translator.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_mdat(translator, atomEnd)
-            elif atom == 0x61617664:  # aavd-variable
-                translator.putInt(ap, 0x6d703461)  # mp4a
-                remaining = remaining - \
-                    translator.write_and_reset(outStream)
-                # don't care about the children.
-                self.copy(inStream, remaining, outStream)
+                    self.walk_mdat(translator, atomStart + atomLength)
+
             else:
                 remaining = remaining - translator.write_and_reset(outStream)
                 # don't care about the children.
                 self.copy(inStream, remaining, outStream)
 
         return endPosition - startPosition
-
-    def status(self, position, filesize):
-        None
 
     def copy(self, inStream, length, *outs) -> int:
         remaining = length
