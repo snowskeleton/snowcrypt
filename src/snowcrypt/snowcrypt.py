@@ -129,10 +129,10 @@ class AaxDecrypter:
                             inStream.read(sampleLength & 0xFFFFFFF0)))
                     # fun fact, the last few bytes of each sample aren't encrypted!
                     if remaining > 0:
-                        self.copy(inStream, remaining, outStream)
+                        copy(inStream, remaining, outStream)
             else:
                 len = translator.write_and_reset(outStream)
-                self.copy(inStream, atomLength +
+                copy(inStream, atomLength +
                           totalBlockSize - len, outStream)
             translator.reset()
 
@@ -142,26 +142,28 @@ class AaxDecrypter:
         inStream = self.inStream
         outStream = self.outStream
         startPosition = inStream.tell()
+        t = translator
         while inStream.tell() < endPosition:
             # read an atom length.
             translator.reset()
             atomStart = inStream.tell()
-            atomLength = translator.readAtomSize(inStream)
-            atom = translator.readInt(inStream)
+            atomLength = t.readAtomSize(inStream)
+            atom = t.readInt(inStream)
+            atomEnd = atomStart + atomLength
 
             remaining = atomLength
 
             if atom == 0x66747970:  # ftyp-none
-                remaining -= translator.write_and_reset(outStream)
-                len = translator.readInto(inStream, remaining)
-                translator.putInt(0,  0x4D344120)  # "M4A "
-                translator.putInt(4,  0x00000200)  # version 2.0?
-                translator.putInt(8,  0x69736F32)  # "iso2"
-                translator.putInt(12, 0x4D344220)  # "M4B "
-                translator.putInt(16, 0x6D703432)  # "mp42"
-                translator.putInt(20, 0x69736F6D)  # "isom"
-                translator.zero(24, len)
-                remaining -= translator.write_and_reset(outStream)
+                remaining -= t.write_and_reset(outStream)
+                len = t.readInto(inStream, remaining)
+                t.putInt(0,  0x4D344120)  # "M4A "
+                t.putInt(4,  0x00000200)  # version 2.0?
+                t.putInt(8,  0x69736F32)  # "iso2"
+                t.putInt(12, 0x4D344220)  # "M4B "
+                t.putInt(16, 0x6D703432)  # "mp42"
+                t.putInt(20, 0x69736F6D)  # "isom"
+                t.zero(24, len)
+                remaining -= t.write_and_reset(outStream)
 
             elif atom == 0x6d6f6f76 \
                     or atom == 0x7472616b \
@@ -169,32 +171,34 @@ class AaxDecrypter:
                     or atom == 0x6d696e66 \
                     or atom == 0x7374626c \
                     or atom == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
-                remaining = remaining - translator.write_and_reset(outStream)
+                remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_atoms(translator, atomStart + atomLength)
+                    self.walk_atoms(t, atomEnd)
             elif atom == 0x6d646174:  # mdat-none
-                remaining = remaining - translator.write_and_reset(outStream)
+                remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_mdat(translator, atomStart + atomLength)
+                    self.walk_mdat(t, atomEnd)
 
             else:
-                remaining = remaining - translator.write_and_reset(outStream)
+                remaining = remaining - t.write_and_reset(outStream)
                 # don't care about the children.
-                self.copy(inStream, remaining, outStream)
+                copy(inStream, remaining, outStream)
 
         return endPosition - startPosition
 
-    def copy(self, inStream, length, *outs) -> int:
-        remaining = length
-        while remaining > 0:
-            remaining = remaining - \
-                self.write(inStream.read(min(remaining, 4096)), *outs)
-        return length
 
-    def write(self, buf, *outs) -> int:
-        for out in outs:
-            out.write(buf)
-        return len(buf)
+def copy(inStream, length, *outs) -> int:
+    remaining = length
+    while remaining > 0:
+        remaining = remaining - \
+            write(inStream.read(min(remaining, 4096)), *outs)
+    return length
+
+
+def write(buf, *outs) -> int:
+    for out in outs:
+        out.write(buf)
+    return len(buf)
 
 
 def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):

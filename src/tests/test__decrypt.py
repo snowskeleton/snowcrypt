@@ -49,7 +49,7 @@ class MyTestCases(unittest.TestCase):
                 # 'args': EsperoAAX,
             }
         ]
-        one, two = race(contestents, 5)
+        one, two = race(contestents, 20)
         print('new: ', str(one)[:3])
         print('old: ', str(two)[:3])
 
