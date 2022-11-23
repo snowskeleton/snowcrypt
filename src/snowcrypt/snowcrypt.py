@@ -253,7 +253,7 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
-    """convenience function for deriving key and initialization vector,
+    """convenience function for deriving AES key and initialization vector,
     then decrypting with those values.
 
     Args:
