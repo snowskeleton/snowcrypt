@@ -39,3 +39,14 @@ You can obtain this value with mkb79's [audible-cli](https://github.com/mkb79/au
 ```
 snowcrypt audioFile.aax -b <activationBytes>
 ```
+
+# Import to other projects
+```
+from snowcrypt import snowcrypt
+key, iv = snowcrypt.deriveKeyIV('input_file.aax', 'activation_bytes')
+snowcrypt.decrypt_aaxc(
+  'input_file.aax', 
+  'output_file.m4a',
+  key,
+  iv)
+```

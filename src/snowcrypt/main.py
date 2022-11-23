@@ -3,11 +3,9 @@ import sys
 from os import path
 
 from .snowcrypt import decrypt_aaxc, deriveKeyIV
-from .localExceptions import *
+from .localExceptions import NotDecryptable
 from .parser import arg
 from .tinytag import MP4
-
-fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
 
 
 def signal_handler(sig, frame):

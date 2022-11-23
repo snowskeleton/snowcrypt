@@ -7,9 +7,7 @@ import io
 from Crypto.Cipher import AES
 from binascii import hexlify
 
-from .localExceptions import *
-
-fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
+from .localExceptions import CredentialMismatch
 
 
 class Translator:
@@ -240,8 +238,7 @@ class AaxDecrypter:
 
 
 def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
-    """
-    Converts inpath with key and iv, writing to outpath
+    """converts inpath with key and iv, writing to outpath
 
     Args:
         inpath (str): source
@@ -256,8 +253,7 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
-    """
-    convenience function for deriving key and initialization vector,
+    """convenience function for deriving AES key and initialization vector,
     then decrypting with those values.
 
     Args:
@@ -278,8 +274,9 @@ def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
         activation_bytes (str): decryption bytes unique to your account
 
     Returns:
-        int, int: key, initialization vector
+        tuple[str, str]: key, initialization vector
     """
+    fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
     _bytes = activation_bytes
     im_key = _snowsha(fixedKey, bytes.fromhex(_bytes))
     iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))[:16]
@@ -290,7 +287,7 @@ def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
     try:
         assert _snowsha(key, iv) == _getChecksum(inStream)
         assert _swapEndien(_bts(data[:4])) == _bytes
-    except:
+    except AssertionError:
         raise CredentialMismatch('Either the activation bytes are incorrect'
                                  ' or the audio file is invalid or corrupt.')
     # if we didn't raise any exceptions, then this file can
@@ -350,8 +347,7 @@ def _getChecksum(inStream: io.BufferedReader):
 
 
 def _swapEndien(string: str):
-    """
-    return given string of hex characters with swapped endian.
+    """return bytes-like string with swapped endian
     turns 12345678 into 78563412
 
     Args:
@@ -364,8 +360,7 @@ def _swapEndien(string: str):
 
 
 def _bts(bytes: bytes) -> str:
-    """
-    convenience function for cleaning up values
+    """convenience function for cleaning up values
 
     Args:
         bytes (bytes): bytes-like object we want as string
@@ -377,27 +372,29 @@ def _bts(bytes: bytes) -> str:
     return str(hexlify(bytes)).strip("'")[2:]
 
 
-def _snowsha(*bits: bytes):
-    """
-    convenience function for deriving keys
+def _snowsha(*bits: bytes, length: int = None):
+    """convenience function for deriving keys
+
+    Args:
+        bits (bytes): input data for sha hash
+        length (int, optional): return only first length characters. Defaults to None (which is All)
 
     Returns:
         bytes: sha digest
     """
-    return hashlib.sha1(b''.join(bits)).digest()
+    return hashlib.sha1(b''.join(bits)).digest()[:length]
 
 
 def _pad(data: bytes, length: int = 16) -> bytes:
-    """
-    pad data to nearest length multiple
+    """pad data to nearest length multiple
 
-    Argcs:
+    Args:
         data (bytes): byte data
-        length (int, optional): Length to pad to. Defaults to 16.
+        length (int, optional): Length to pad to. Defaults to 16
 
     Returns:
         bytes: same bytes appended with N additional bytes of value N,
         where N is len(data) modulus length
     """
-    l = length - (len(data) % length)
-    return data + bytes([l])*l
+    length = length - (len(data) % length)
+    return data + bytes([length])*length
