@@ -20,21 +20,23 @@ class Translator:
     def reset(self):
         self.pos, self.wpos = 0, 0
 
-    def position(self): return self.pos
-    def getShort(self): return self.getOne(self.fshort)
-    def getInt(self): return self.getOne(self.fint)
-    def getLong(self): return self.getOne(self.flong)
-    def putInt(self, position, value): self.putOne(self.fint, position, value)
+    def position(self) -> int: return self.pos
+    def getShort(self) -> int: return self.getOne(self.fshort)
+    def getInt(self) -> int: return self.getOne(self.fint)
+    def getLong(self) -> int: return self.getOne(self.flong)
+
+    def putInt(self, position: int, value: int): self.putOne(
+        self.fint, position, value)
 
     def getOne(self, format):
         r = struct.unpack_from(format[0], self.buf, self.pos)[0]
         self.pos = self.pos + format[1]
         return r
 
-    def putOne(self, format, position, value):
+    def putOne(self, format: str | bytes, position: int, value):
         struct.pack_into(format[0], self.buf, position, value)
 
-    def readOne(self, inStream, format):
+    def readOne(self, inStream: io.BufferedReader, format: str | bytes):
         length = format[1]
         self.buf[self.wpos: self.wpos + length] = inStream.read(length)
         r = struct.unpack_from(format[0], self.buf, self.pos)[0]
@@ -42,7 +44,7 @@ class Translator:
         self.pos = self.pos + length
         return r
 
-    def readInto(self, inStream, length) -> int:
+    def readInto(self, inStream: io.BufferedReader, length: int | None) -> int:
         self.buf[self.wpos: self.wpos + length] = inStream.read(length)
         self.wpos = self.wpos + length
         return length
@@ -59,17 +61,17 @@ class Translator:
             return self.wpos
         return 0
 
-    def readInt(self, inStream):
+    def readInt(self, inStream: io.BufferedReader) -> int:
         return self.readOne(inStream, self.fint)
 
-    def readLong(self, inStream):
+    def readLong(self, inStream: io.BufferedReader) -> int:
         return self.readOne(inStream, self.flong)
 
     def skipInt(self): self.skip(self.fint[1])
     def skipLong(self): self.skip(self.flong[1])
     def skip(self, length): self.pos = self.pos + length
 
-    def readAtomSize(self, inStream):
+    def readAtomSize(self, inStream: io.BufferedReader) -> int:
         atomLength = self.readInt(inStream)
         return atomLength if atomLength != 1 else self.readLong(inStream)
 
@@ -86,22 +88,18 @@ class Translator:
 
 
 class AaxDecrypter:
-    filetypes = {6: "html", 7: "xml", 12: "gif",
-                 13: "jpg", 14: "png", 15: "url", 27: "bmp"}
-
-    def __init__(self, inStream, outStream, key, iv):
+    def __init__(self, inStream: io.BufferedReader, outStream: io.BufferedWriter, key: str, iv: str):
         self.key = bytes.fromhex(key)
         self.iv = bytes.fromhex(iv)
         self.inStream = inStream
         self.outStream = outStream
 
-    def walk_mdat(self, translator, endPosition):  # samples
+    def walk_mdat(self, translator: Translator, endPosition: int):  # samples
         inStream = self.inStream
         outStream = self.outStream
         startPosition = inStream.tell()
         # It's illegal for mdat to contain atoms... but that didn't stop Audible! Not that any parsers care.
         while inStream.tell() < endPosition:
-            # self.status(inStream.tell(), self.filesize)
             # read an atom length.
             atomStart = inStream.tell()
             translator.reset()
@@ -127,7 +125,6 @@ class AaxDecrypter:
                 translator.readInto(inStream, blockCount * 4)
                 translator.write(outStream)
                 for _ in range(blockCount):
-                    # self.status(inStream.tell(),  self.filesize)
                     sampleLength = translator.getInt()
                     # has to be reset every go round.
                     cipher = AES.new(self.key, AES.MODE_CBC, iv=self.iv)
@@ -146,7 +143,7 @@ class AaxDecrypter:
 
         return endPosition - startPosition
 
-    def walk_atoms(self, translator, endPosition):  # everything
+    def walk_atoms(self, translator: Translator, endPosition: int):  # everything
         inStream = self.inStream
         outStream = self.outStream
         startPosition = inStream.tell()
@@ -174,6 +171,9 @@ class AaxDecrypter:
                 translator.zero(24, len)
                 remaining = remaining - \
                     translator.write_and_reset(outStream)
+
+
+
             elif atom == 0x6d6f6f76 \
                     or atom == 0x7472616b \
                     or atom == 0x6d646961 \
