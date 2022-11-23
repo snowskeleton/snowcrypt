@@ -1,6 +1,6 @@
 import unittest
 from ..snowcrypt.snowcrypt import decrypt_aax, decrypt_aaxc, deriveKeyIV
-from ..snowcrypt.decrypt import decrypt_local as oldcrypt
+from ..snowcrypt.oldcrypt import decrypt_local as oldcrypt
 import time
 
 
