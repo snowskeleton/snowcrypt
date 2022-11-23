@@ -3,7 +3,7 @@ import sys
 from os import path
 
 from .snowcrypt import decrypt_aaxc, deriveKeyIV
-from .localExceptions import *
+from .localExceptions import NotDecryptable
 from .parser import arg
 from .tinytag import MP4
 

@@ -7,7 +7,7 @@ import io
 from Crypto.Cipher import AES
 from binascii import hexlify
 
-from .localExceptions import *
+from .localExceptions import CredentialMismatch
 
 
 class Translator:
@@ -287,7 +287,7 @@ def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
     try:
         assert _snowsha(key, iv) == _getChecksum(inStream)
         assert _swapEndien(_bts(data[:4])) == _bytes
-    except:
+    except AssertionError:
         raise CredentialMismatch('Either the activation bytes are incorrect'
                                  ' or the audio file is invalid or corrupt.')
     # if we didn't raise any exceptions, then this file can
@@ -396,5 +396,5 @@ def _pad(data: bytes, length: int = 16) -> bytes:
         bytes: same bytes appended with N additional bytes of value N,
         where N is len(data) modulus length
     """
-    l = length - (len(data) % length)
-    return data + bytes([l])*l
+    length = length - (len(data) % length)
+    return data + bytes([length])*length
