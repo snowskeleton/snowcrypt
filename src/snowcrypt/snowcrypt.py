@@ -139,7 +139,6 @@ class AaxDecrypter:
                 self.copy(inStream, atomLength +
                           totalBlockSize - len, outStream)
             translator.reset()
-            self.checkPosition(atomEnd)
 
         return endPosition - startPosition
 
@@ -148,7 +147,6 @@ class AaxDecrypter:
         outStream = self.outStream
         startPosition = inStream.tell()
         while inStream.tell() < endPosition:
-            # self.status(inStream.tell(), self.filesize)
             # read an atom length.
             translator.reset()
             atomStart = inStream.tell()
@@ -210,9 +208,6 @@ class AaxDecrypter:
                 # don't care about the children.
                 self.copy(inStream, remaining, outStream)
 
-            self.checkPosition(atomEnd)
-
-        # self.status(inStream.tell(), self.filesize)
         return endPosition - startPosition
 
     def status(self, position, filesize):
@@ -229,12 +224,6 @@ class AaxDecrypter:
         for out in outs:
             out.write(buf)
         return len(buf)
-
-    def checkPosition(self, position):
-        ip = self.inStream.tell()
-        op = self.outStream.tell()
-        if ip != op or ip != position:
-            print("IP: %d\tOP: %d\tP: %d" % (ip, op, position))
 
 
 def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
