@@ -8,7 +8,6 @@ import io
 
 from Crypto.Cipher import AES
 from binascii import hexlify
-from collections import defaultdict
 
 from .localExceptions import CredentialMismatch
 
@@ -109,7 +108,6 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
 
             # after the atom type comes 5 additional fields describing the data.
             # We only care about the last two.
-            t.readAtom(inStream,)
             t._readInto(inStream, 20)
             t._skipInt()  # time in ms
             t._skipInt()  # first block index
@@ -124,6 +122,13 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
                 t._putInt(atomTypePosition, 0x6d703461)  # mp4a
                 t._readInto(inStream, blockCount * 4)
                 t._write(outStream)
+                # def someFunc():
+                #     sampLeng = t._getInt()
+                #     decrypted = c.decrypt(inStream.read(sampLeng & 0xFFFFFFF0))
+                #     remaining = sampLeng - outStream.write(decrypted)
+                #     # fun fact, the last few bytes of each sample aren't encrypted!
+                #     _copy(inStream, remaining, outStream)
+                # map(someFunc, _cipherGen(key, iv, blockCount))
                 for c in _cipherGen(key, iv, blockCount):
                     sampLeng = t._getInt()
                     decrypted = c.decrypt(inStream.read(sampLeng & 0xFFFFFFF0))
