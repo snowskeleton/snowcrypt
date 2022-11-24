@@ -32,11 +32,12 @@ class MyTestCases(unittest.TestCase):
         # num = 0
         # print(run(contestents[num]['func'], contestents[num]['args']))
         one, two = race(contestents, 10)
-        print('new : ', str(one)[:3])
-        print('old : ', str(two)[:3])
-        print('new : ', str(one))
-        print('old : ', str(two))
-        assert filecmp.cmp(file1, file2)
+        try:
+            assert filecmp.cmp(file1, file2)
+            print('new : ', str(one)[:3])
+            print('old : ', str(two)[:3])
+        except AssertionError:
+            print('Files are not the same')
 
 
 def main():

@@ -88,6 +88,16 @@ class Translator:
         self.reset()
         return r
 
+    def fillFtyp(self, inStream, remaining):
+        len = self.readInto(inStream, remaining)
+        self.putInt(0,  0x4D344120)  # "M4A "
+        self.putInt(4,  0x00000200)  # version 2.0?
+        self.putInt(8,  0x69736F32)  # "iso2"
+        self.putInt(12, 0x4D344220)  # "M4B "
+        self.putInt(16, 0x6D703432)  # "mp42"
+        self.putInt(20, 0x69736F6D)  # "isom"
+        self.zero(24, len)
+
 
 def _cipherGen(key, iv, count):
     return [AES.new(key, AES.MODE_CBC, iv=iv) for _ in range(count)]
@@ -148,15 +158,16 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
 
             if atom == 0x66747970:  # ftyp-none
                 remaining -= t.write_and_reset(outStream)
-                len = t.readInto(inStream, remaining)
-                t.putInt(0,  0x4D344120)  # "M4A "
-                t.putInt(4,  0x00000200)  # version 2.0?
-                t.putInt(8,  0x69736F32)  # "iso2"
-                t.putInt(12, 0x4D344220)  # "M4B "
-                t.putInt(16, 0x6D703432)  # "mp42"
-                t.putInt(20, 0x69736F6D)  # "isom"
-                t.zero(24, len)
+                t.fillFtyp(inStream, remaining)
                 remaining -= t.write_and_reset(outStream)
+                # len = t.readInto(inStream, remaining)
+                # t.putInt(0,  0x4D344120)  # "M4A "
+                # t.putInt(4,  0x00000200)  # version 2.0?
+                # t.putInt(8,  0x69736F32)  # "iso2"
+                # t.putInt(12, 0x4D344220)  # "M4B "
+                # t.putInt(16, 0x6D703432)  # "mp42"
+                # t.putInt(20, 0x69736F6D)  # "isom"
+                # t.zero(24, len)
 
             elif atom == 0x6d6f6f76 \
                     or atom == 0x7472616b \
