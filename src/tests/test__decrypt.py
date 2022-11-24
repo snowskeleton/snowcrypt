@@ -1,4 +1,6 @@
 import sys
+import signal
+import os
 import filecmp
 import unittest
 import os
@@ -9,6 +11,11 @@ import cProfile
 import pstats
 
 from .longvars import *
+from ..snowcrypt.localExceptions import NotDecryptable
+
+
+def handler(*_):
+    raise NotDecryptable()
 
 contestents = [{
     'func': newcrypt,
@@ -31,13 +38,24 @@ class MyTestCases(unittest.TestCase):
         # sys.exit()
         # num = 0
         # print(run(contestents[num]['func'], contestents[num]['args']))
-        one, two = race(contestents, 10)
         try:
+            signal.signal(signal.SIGALRM, handler)
+            signal.alarm(10)
+            one, two = race(contestents, 20)
             assert filecmp.cmp(file1, file2)
-            print('new : ', str(one)[:3])
-            print('old : ', str(two)[:3])
+            one = str(one)[:3]
+            two = str(two)[:3]
+            print('new : ', one)
+            print('old : ', two)
+            print(int(two) - int(one))
         except AssertionError:
+            signal.alarm(0)          # Disable the alarm
             print('Files are not the same')
+        except NotDecryptable:
+            print('Decryption took too long')
+        except KeyboardInterrupt:
+            print('\nReceived escape sequence')
+
 
 
 def main():
