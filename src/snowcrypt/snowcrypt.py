@@ -8,6 +8,7 @@ import io
 
 from Crypto.Cipher import AES
 from binascii import hexlify
+from collections import defaultdict
 
 from .localExceptions import CredentialMismatch
 
@@ -151,36 +152,36 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
             atomStart = inStream.tell()
             atomLength = t.readAtomSize(inStream)
             atomEnd = atomStart + atomLength
-            ap = t.position()
-            atom = t.readInt(inStream)
+            atomPosition = t.position()
+            atomType = t.readInt(inStream)
 
             remaining = atomLength
 
-            if atom == 0x66747970:  # ftyp-none
+            if atomType == 0x66747970:  # ftyp-none
                 remaining -= t.write_and_reset(outStream)
                 t.fillFtyp(inStream, remaining)
                 remaining -= t.write_and_reset(outStream)
-            elif atom == 0x6d6f6f76 \
-                    or atom == 0x7472616b \
-                    or atom == 0x6d646961 \
-                    or atom == 0x6d696e66 \
-                    or atom == 0x7374626c \
-                    or atom == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
+            elif atomType == 0x6d6f6f76 \
+                    or atomType == 0x7472616b \
+                    or atomType == 0x6d646961 \
+                    or atomType == 0x6d696e66 \
+                    or atomType == 0x7374626c \
+                    or atomType == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
                 remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - walk_atoms(t, atomEnd)
-            elif atom == 0x6D657461:  # meta-4
+            elif atomType == 0x6D657461:  # meta-4
                 t.readInto(inStream, 4)
                 remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - walk_atoms(t, atomEnd)
-            elif atom == 0x73747364:  # stsd-8
+            elif atomType == 0x73747364:  # stsd-8
                 t.readInto(inStream, 8)
                 remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - walk_atoms(t, atomEnd)
-            elif atom == 0x6d646174:  # mdat-none
+            elif atomType == 0x6d646174:  # mdat-none
                 remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - walk_mdat(t, atomEnd)
-            elif atom == 0x61617664:  # aavd-variable
-                t.putInt(ap, 0x6d703461)  # mp4a
+            elif atomType == 0x61617664:  # aavd-variable
+                t.putInt(atomPosition, 0x6d703461)  # mp4a
                 remaining = remaining - t.write_and_reset(outStream)
                 # don't care about the children.
                 copy(inStream, remaining, outStream)
