@@ -160,15 +160,6 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
                 remaining -= t.write_and_reset(outStream)
                 t.fillFtyp(inStream, remaining)
                 remaining -= t.write_and_reset(outStream)
-                # len = t.readInto(inStream, remaining)
-                # t.putInt(0,  0x4D344120)  # "M4A "
-                # t.putInt(4,  0x00000200)  # version 2.0?
-                # t.putInt(8,  0x69736F32)  # "iso2"
-                # t.putInt(12, 0x4D344220)  # "M4B "
-                # t.putInt(16, 0x6D703432)  # "mp42"
-                # t.putInt(20, 0x69736F6D)  # "isom"
-                # t.zero(24, len)
-
             elif atom == 0x6d6f6f76 \
                     or atom == 0x7472616b \
                     or atom == 0x6d646961 \
@@ -202,7 +193,7 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
     walk_atoms(Translator(), os.path.getsize(inStream.name))
 
 
-def copy(inStream, length, *outs) -> int:
+def copy(inStream: io.BufferedReader, length: int, *outs) -> int:
     remaining = length
     while remaining > 0:
         remaining = remaining - \
