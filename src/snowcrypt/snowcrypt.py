@@ -167,26 +167,26 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
                     or atomType == 0x6d696e66 \
                     or atomType == 0x7374626c \
                     or atomType == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
-                remaining = remaining - t.write_and_reset(outStream)
-                remaining = remaining - walk_atoms(t, atomEnd)
+                remaining -= t.write_and_reset(outStream)
+                remaining -= walk_atoms(t, atomEnd)
             elif atomType == 0x6D657461:  # meta-4
                 t.readInto(inStream, 4)
-                remaining = remaining - t.write_and_reset(outStream)
-                remaining = remaining - walk_atoms(t, atomEnd)
+                remaining -= t.write_and_reset(outStream)
+                remaining -= walk_atoms(t, atomEnd)
             elif atomType == 0x73747364:  # stsd-8
                 t.readInto(inStream, 8)
-                remaining = remaining - t.write_and_reset(outStream)
-                remaining = remaining - walk_atoms(t, atomEnd)
+                remaining -= t.write_and_reset(outStream)
+                remaining -= walk_atoms(t, atomEnd)
             elif atomType == 0x6d646174:  # mdat-none
-                remaining = remaining - t.write_and_reset(outStream)
-                remaining = remaining - walk_mdat(t, atomEnd)
+                remaining -= t.write_and_reset(outStream)
+                remaining -= walk_mdat(t, atomEnd)
             elif atomType == 0x61617664:  # aavd-variable
                 t.putInt(atomPosition, 0x6d703461)  # mp4a
-                remaining = remaining - t.write_and_reset(outStream)
+                remaining -= t.write_and_reset(outStream)
                 # don't care about the children.
                 copy(inStream, remaining, outStream)
             else:
-                remaining = remaining - t.write_and_reset(outStream)
+                remaining -= t.write_and_reset(outStream)
                 # don't care about the children.
                 copy(inStream, remaining, outStream)
         return endPosition - startPosition
@@ -197,7 +197,7 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
 def copy(inStream: io.BufferedReader, length: int, *outs) -> int:
     remaining = length
     while remaining > 0:
-        remaining = remaining - \
+        remaining -= \
             write(inStream.read(min(remaining, 4096)), *outs)
     return length
 
