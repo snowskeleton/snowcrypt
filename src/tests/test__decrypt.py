@@ -43,11 +43,11 @@ class MyTestCases(unittest.TestCase):
             signal.alarm(10)
             one, two = race(contestents, 20)
             assert filecmp.cmp(file1, file2)
-            one = str(one)[:3]
-            two = str(two)[:3]
+            one = str(one)[:5]
+            two = str(two)[:5]
             print('new : ', one)
             print('old : ', two)
-            print(int(two) - int(one))
+            # print(int(two) - int(one))
         except AssertionError:
             signal.alarm(0)          # Disable the alarm
             print('Files are not the same')
