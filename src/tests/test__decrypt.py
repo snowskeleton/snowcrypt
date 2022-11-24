@@ -50,8 +50,10 @@ class MyTestCases(unittest.TestCase):
             }
         ]
         one, two = race(contestents, 20)
-        print('new: ', str(one)[:3])
-        print('old: ', str(two)[:3])
+        print('new: ', str(one))
+        print('old: ', str(two))
+        # print('new: ', str(one)[:3])
+        # print('old: ', str(two)[:3])
 
 
 def main():

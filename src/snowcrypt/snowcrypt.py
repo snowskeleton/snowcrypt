@@ -88,16 +88,8 @@ class Translator:
         return r
 
 
-class AaxDecrypter:
-    def __init__(self, inStream: io.BufferedReader, outStream: io.BufferedWriter, key: str, iv: str):
-        self.key = bytes.fromhex(key)
-        self.iv = bytes.fromhex(iv)
-        self.inStream = inStream
-        self.outStream = outStream
-
-    def walk_mdat(self, translator: Translator, endPosition: int):  # samples
-        inStream = self.inStream
-        outStream = self.outStream
+def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: str, iv: str):
+    def walk_mdat(translator: Translator, endPosition: int):  # samples
         startPosition = inStream.tell()
         while inStream.tell() < endPosition:
             translator.reset()
@@ -123,7 +115,7 @@ class AaxDecrypter:
                 for _ in range(blockCount):
                     sampleLength = translator.getInt()
                     # has to be reset every go round.
-                    cipher = AES.new(self.key, AES.MODE_CBC, iv=self.iv)
+                    cipher = AES.new(key, AES.MODE_CBC, iv=iv)
                     remaining = sampleLength - \
                         outStream.write(cipher.decrypt(
                             inStream.read(sampleLength & 0xFFFFFFF0)))
@@ -138,9 +130,7 @@ class AaxDecrypter:
 
         return endPosition - startPosition
 
-    def walk_atoms(self, translator: Translator, endPosition: int):  # everything
-        inStream = self.inStream
-        outStream = self.outStream
+    def walk_atoms(translator: Translator, endPosition: int):  # everything
         startPosition = inStream.tell()
         t = translator
         while inStream.tell() < endPosition:
@@ -173,11 +163,11 @@ class AaxDecrypter:
                     or atom == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
                 remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_atoms(t, atomEnd)
+                    walk_atoms(t, atomEnd)
             elif atom == 0x6d646174:  # mdat-none
                 remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - \
-                    self.walk_mdat(t, atomEnd)
+                    walk_mdat(t, atomEnd)
 
             else:
                 remaining = remaining - t.write_and_reset(outStream)
@@ -212,8 +202,9 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
     """
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
-            decrypter = AaxDecrypter(src, dest, key, iv)
-            decrypter.walk_atoms(Translator(), os.path.getsize(inpath))
+            someFunc(src, dest, key, iv)
+            # decrypter = AaxDecrypter(src, dest, key, iv)
+            # decrypter.walk_atoms(Translator(), os.path.getsize(inpath))
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
