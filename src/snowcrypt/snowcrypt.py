@@ -1,4 +1,5 @@
 import sys
+import asyncio
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
 import struct
 import os
@@ -88,11 +89,14 @@ class Translator:
         return r
 
 
-def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: bytes, iv: bytes):
+def _cipherGen(key, iv, count):
+    return [AES.new(key, AES.MODE_CBC, iv=iv) for _ in range(count)]
+
+
+def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: bytes, iv: bytes):
     def walk_mdat(translator: Translator, endPosition: int):  # samples
         startPosition = inStream.tell()
         while inStream.tell() < endPosition:
-            atomStart = inStream.tell()
             translator.reset()
             atomLength = translator.readAtomSize(inStream)
             atomTypePosition = translator.position()
@@ -114,16 +118,12 @@ def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
                 translator.putInt(atomTypePosition, 0x6d703461)  # mp4a
                 translator.readInto(inStream, blockCount * 4)
                 translator.write(outStream)
-                for _ in range(blockCount):
-                    sampleLength = translator.getInt()
-                    # has to be reset every go round.
-                    cipher = AES.new(key, AES.MODE_CBC, iv=iv)
-                    remaining = sampleLength - \
-                        outStream.write(cipher.decrypt(
-                            inStream.read(sampleLength & 0xFFFFFFF0)))
+                for c in _cipherGen(key, iv, blockCount):
+                    sampLeng = translator.getInt()
+                    decrypted = c.decrypt(inStream.read(sampLeng & 0xFFFFFFF0))
+                    remaining = sampLeng - outStream.write(decrypted)
                     # fun fact, the last few bytes of each sample aren't encrypted!
-                    if remaining > 0:
-                        copy(inStream, remaining, outStream)
+                    copy(inStream, remaining, outStream)
             else:
                 len = translator.write_and_reset(outStream)
                 copy(inStream, atomLength +
@@ -165,28 +165,21 @@ def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
                     or atom == 0x7374626c \
                     or atom == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
                 remaining = remaining - t.write_and_reset(outStream)
-                remaining = remaining - \
-                    walk_atoms(t, atomEnd)
+                remaining = remaining - walk_atoms(t, atomEnd)
             elif atom == 0x6D657461:  # meta-4
                 t.readInto(inStream, 4)
-                remaining = remaining - \
-                    t.write_and_reset(outStream)
-                remaining = remaining - \
-                    walk_atoms(t, atomEnd)
+                remaining = remaining - t.write_and_reset(outStream)
+                remaining = remaining - walk_atoms(t, atomEnd)
             elif atom == 0x73747364:  # stsd-8
                 t.readInto(inStream, 8)
-                remaining = remaining - \
-                    t.write_and_reset(outStream)
-                remaining = remaining - \
-                    walk_atoms(t, atomEnd)
+                remaining = remaining - t.write_and_reset(outStream)
+                remaining = remaining - walk_atoms(t, atomEnd)
             elif atom == 0x6d646174:  # mdat-none
                 remaining = remaining - t.write_and_reset(outStream)
-                remaining = remaining - \
-                    walk_mdat(t, atomEnd)
+                remaining = remaining - walk_mdat(t, atomEnd)
             elif atom == 0x61617664:  # aavd-variable
                 t.putInt(ap, 0x6d703461)  # mp4a
-                remaining = remaining - \
-                    t.write_and_reset(outStream)
+                remaining = remaining - t.write_and_reset(outStream)
                 # don't care about the children.
                 copy(inStream, remaining, outStream)
             else:
@@ -221,11 +214,11 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
         key (int): AES key
         iv (int): AES initialization vector
     """
+    key = bytes.fromhex(key)
+    iv = bytes.fromhex(iv)
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
-            someFunc(src, dest, bytes.fromhex(key), bytes.fromhex(iv))
-            # decrypter = AaxDecrypter(src, dest, key, iv)
-            # decrypter.walk_atoms(Translator(), os.path.getsize(inpath))
+            _decrypt(src, dest, key, iv)
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
