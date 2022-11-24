@@ -1,10 +1,8 @@
-import sys
-import asyncio
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
-import struct
-import os
-import hashlib
-import io
+from struct import unpack_from, pack_into
+from os import path
+from hashlib import sha1
+from io import BufferedReader, BufferedWriter
 
 from Crypto.Cipher import AES
 from binascii import hexlify
@@ -32,22 +30,22 @@ class Translator:
         fint, position, value)
 
     def _getOne(self, format):
-        r = struct.unpack_from(format[0], self.buf, self.pos)[0]
+        r = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos = self.pos + format[1]
         return r
 
     def _putOne(self, format: str | bytes, position: int, value):
-        struct.pack_into(format[0], self.buf, position, value)
+        pack_into(format[0], self.buf, position, value)
 
-    def _readOne(self, inStream: io.BufferedReader, format: str | bytes):
+    def _readOne(self, inStream: BufferedReader, format: str | bytes):
         length = format[1]
         self.buf[self.wpos: self.wpos + length] = inStream.read(length)
-        r = struct.unpack_from(format[0], self.buf, self.pos)[0]
+        r = unpack_from(format[0], self.buf, self.pos)[0]
         self.wpos = self.wpos + length
         self.pos = self.pos + length
         return r
 
-    def _readInto(self, inStream: io.BufferedReader, length: int | None) -> int:
+    def _readInto(self, inStream: BufferedReader, length: int | None) -> int:
         self.buf[self.wpos: self.wpos + length] = inStream.read(length)
         self.wpos = self.wpos + length
         return length
@@ -62,17 +60,17 @@ class Translator:
             return self.wpos
         return 0
 
-    def _readInt(self, inStream: io.BufferedReader) -> int:
+    def _readInt(self, inStream: BufferedReader) -> int:
         return self._readOne(inStream, fint)
 
-    def _readLong(self, inStream: io.BufferedReader) -> int:
+    def _readLong(self, inStream: BufferedReader) -> int:
         return self._readOne(inStream, flong)
 
     def _skipInt(self): self._skip(fint[1])
     def _skipLong(self): self._skip(flong[1])
     def _skip(self, length): self.pos = self.pos + length
 
-    def _readAtomSize(self, inStream: io.BufferedReader) -> int:
+    def _readAtomSize(self, inStream: BufferedReader) -> int:
         atomLength = self._readInt(inStream)
         return atomLength if atomLength != 1 else self._readLong(inStream)
 
@@ -98,7 +96,7 @@ def _cipherGen(key, iv, count):
     return [AES.new(key, AES.MODE_CBC, iv=iv) for _ in range(count)]
 
 
-def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: bytes, iv: bytes):
+def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
     def walk_mdat(endPosition: int):  # samples
         while inStream.tell() < endPosition:
             t = Translator()
@@ -142,7 +140,6 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
 
     def walk_atoms(endPosition: int):  # everything
         while inStream.tell() < endPosition:
-            # read an atom length.
             t = Translator()
             atomStart = inStream.tell()
             atomLength = t._readAtomSize(inStream)
@@ -178,14 +175,12 @@ def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: byt
             elif atomType == 0x61617664:  # aavd-variable
                 t._putInt(atomPosition, 0x6d703461)  # mp4a
                 remaining -= t._write(outStream)
-                # don't care about the children.
                 _copy(inStream, remaining, outStream)
             else:
                 remaining -= t._write(outStream)
-                # don't care about the children.
                 _copy(inStream, remaining, outStream)
 
-    walk_atoms(os.path.getsize(inStream.name))
+    walk_atoms(path.getsize(inStream.name))
 
 
 def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
@@ -218,11 +213,11 @@ def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
     decrypt_aaxc(inpath, outpath, key, iv)
 
 
-def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
-    """derive key and initialization vector for given io.BufferReader
+def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
+    """derive key and initialization vector for given BufferReader
 
     Args:
-        inStream (io.BufferedReader): open file stream
+        inStream (BufferedReader): open file stream
         activation_bytes (str): decryption bytes unique to your account
 
     Returns:
@@ -272,11 +267,11 @@ def _getDrm(data: bytes):
     return data[26:42]
 
 
-def _getAdrmBlob(inStream: io.BufferedReader):
+def _getAdrmBlob(inStream: BufferedReader):
     """read ADRM from inStream
 
     Args:
-        inStream (io.BufferReader): an open file stream
+        inStream (BufferReader): an open file stream
 
     Returns:
         int: adrm blob
@@ -285,11 +280,11 @@ def _getAdrmBlob(inStream: io.BufferedReader):
     return inStream.read(56)
 
 
-def _getChecksum(inStream: io.BufferedReader):
+def _getChecksum(inStream: BufferedReader):
     """read file checksum from inStream
 
     Args:
-        inStream (io.BufferReader): an open file stream
+        inStream (BufferReader): an open file stream
 
     Returns:
         int: checksum
@@ -334,7 +329,7 @@ def _snowsha(*bits: bytes, length: int = None):
     Returns:
         bytes: sha digest
     """
-    return hashlib.sha1(b''.join(bits)).digest()[:length]
+    return sha1(b''.join(bits)).digest()[:length]
 
 
 def _pad(data: bytes, length: int = 16) -> bytes:
@@ -352,7 +347,7 @@ def _pad(data: bytes, length: int = 16) -> bytes:
     return data + bytes([length])*length
 
 
-def _copy(inStream: io.BufferedReader, length: int, *outs) -> int:
+def _copy(inStream: BufferedReader, length: int, *outs) -> int:
     remaining = length
     while remaining > 0:
         remaining -= \
