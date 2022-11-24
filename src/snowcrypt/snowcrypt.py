@@ -53,8 +53,6 @@ class Translator:
         self.wpos = self.wpos + length
         return length
 
-    def _readCount(self) -> int: return self.wpos
-
     def _write(self, *outs) -> int:
         if self.wpos > 0:
             # fuck you python and your write function that can't sublist!
@@ -104,35 +102,36 @@ def _cipherGen(key, iv, count):
 def _decrypt(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: bytes, iv: bytes):
     def walk_mdat(endPosition: int):  # samples
         while inStream.tell() < endPosition:
-            translator = Translator()
-            atomLength = translator._readAtomSize(inStream)
-            atomTypePosition = translator._position()
-            atomType = translator._readInt(inStream)
+            t = Translator()
+            atomLength = t._readAtomSize(inStream)
+            atomTypePosition = t._position()
+            atomType = t._readInt(inStream)
 
             # after the atom type comes 5 additional fields describing the data.
             # We only care about the last two.
-            translator._readInto(inStream, 20)
-            translator._skipInt()  # time in ms
-            translator._skipInt()  # first block index
-            translator._skipInt()  # trak number
-            totalBlockSize = translator._getInt()  # total size of all blocks
-            blockCount = translator._getInt()  # number of blocks
+            t.readAtom(inStream,)
+            t._readInto(inStream, 20)
+            t._skipInt()  # time in ms
+            t._skipInt()  # first block index
+            t._skipInt()  # trak number
+            totalBlockSize = t._getInt()  # total size of all blocks
+            blockCount = t._getInt()  # number of blocks
             # atomEnd = atomStart + atomLength + totalBlockSize
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
             if atomType == 0x61617664:  # aavd
-                translator._putInt(atomTypePosition, 0x6d703461)  # mp4a
-                translator._readInto(inStream, blockCount * 4)
-                translator._write(outStream)
+                t._putInt(atomTypePosition, 0x6d703461)  # mp4a
+                t._readInto(inStream, blockCount * 4)
+                t._write(outStream)
                 for c in _cipherGen(key, iv, blockCount):
-                    sampLeng = translator._getInt()
+                    sampLeng = t._getInt()
                     decrypted = c.decrypt(inStream.read(sampLeng & 0xFFFFFFF0))
                     remaining = sampLeng - outStream.write(decrypted)
                     # fun fact, the last few bytes of each sample aren't encrypted!
                     _copy(inStream, remaining, outStream)
             else:
-                len = translator._write(outStream)
+                len = t._write(outStream)
                 _copy(inStream, atomLength +
                       totalBlockSize - len, outStream)
 
