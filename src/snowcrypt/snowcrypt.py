@@ -81,14 +81,14 @@ class Translator:
             self.buf[i] = 0
 
     def _fillFtyp(self, inStream, remaining, outStream):
-        len = self._readInto(inStream, remaining)
+        length = self._readInto(inStream, remaining)
         self._putInt(0,  0x4D344120)  # "M4A "
         self._putInt(4,  0x00000200)  # version 2.0?
         self._putInt(8,  0x69736F32)  # "iso2"
         self._putInt(12, 0x4D344220)  # "M4B "
         self._putInt(16, 0x6D703432)  # "mp42"
         self._putInt(20, 0x69736F6D)  # "isom"
-        self._zero(24, len)
+        self._zero(24, length)
         self._write(outStream)
 
 
@@ -134,9 +134,9 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                     # fun fact, the last few bytes of each sample aren't encrypted!
                     _copy(inStream, remaining, outStream)
             else:
-                len = t._write(outStream)
+                length = t._write(outStream)
                 _copy(inStream, atomLength +
-                      totalBlockSize - len, outStream)
+                      totalBlockSize - length, outStream)
 
     def walk_atoms(endPosition: int):  # everything
         while inStream.tell() < endPosition:
