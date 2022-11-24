@@ -116,7 +116,7 @@ class AaxDecrypter:
             totalBlockSize = translator.getInt()  # total size of all blocks
             blockCount = translator.getInt()  # number of blocks
 
-            atomEnd = atomStart + atomLength + totalBlockSize
+            # atomEnd = atomStart + atomLength + totalBlockSize
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
@@ -169,9 +169,6 @@ class AaxDecrypter:
                 translator.zero(24, len)
                 remaining = remaining - \
                     translator.write_and_reset(outStream)
-
-
-
             elif atom == 0x6d6f6f76 \
                     or atom == 0x7472616b \
                     or atom == 0x6d646961 \

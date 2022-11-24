@@ -1,8 +1,11 @@
+import sys
 import unittest
 import os
 from ..snowcrypt.snowcrypt import decrypt_aaxc as newcrypt
 from ..snowcrypt.oldcrypt import decrypt_aaxc as oldcrypt
 import time
+import cProfile
+import pstats
 
 
 def avg(list: list):
@@ -30,21 +33,39 @@ def race(funcs: list[dict], laps: int):
         elap1.append(run(one['func'], one['args']))
         elap2.append(run(two['func'], two['args']))
 
-    return avg(elap1), avg(elap2)
+    return int(avg(elap1)), int(avg(elap2))
 
 
 class MyTestCases(unittest.TestCase):
     def test__decrypt_local(self):
         contestents = [{
-            'func': os.system,
-            'args': scSystemStormAAXC,
+            # 'func': os.system,
+            'func': newcrypt,
+            'args': StormAAXC,
+            # 'args': scSystemStormAAXC,
         }, {
-            'func': os.system,
-            'args': ffSystemStormAAXC
+            # 'func': os.system,
+            'func': oldcrypt,
+            'args': StormAAXC
+            # 'args': ffSystemStormAAXC
         }]
-        one, two = race(contestents, 1)
-        print('snowcrypt: ', str(one))
-        print('ffmpeg   : ', str(two))
+        # profile = cProfile.Profile()
+        # profile.runcall(run, contestents[0]['func'], contestents[0]['args'])
+        # ps = pstats.Stats(profile)
+        # ps.print_stats()
+        num = 0
+        run(contestents[num]['func'], contestents[num]['args'])
+        sys.exit()
+        one, two = race(contestents, 15)
+        print('new : ', str(one)[:3])
+        print('old : ', str(two)[:3])
+        assert len(str(one)) == len(str(two))
+        # print('new : ', str(one))
+        # print('old : ', str(two))
+        # print('snowcrypt: ', str(one))
+        # print('ffmpeg   : ', str(two))
+        # num = 0
+        # run(contestents[num]['func'], contestents[num]['args'])
 
 
 def main():
@@ -69,10 +90,6 @@ scSystemStormAAXC = [' '.join([
     'python pyi_entrypoint.py',
     'The_Gathering_Storm_Interview_with_the_Narrators-AAX_22_64.aaxc',
     'The Gathering Storm: Interview with the Narrators.m4a',
-    '--key',
-    'edd4992ee4a03f8c83601b36468aa98b',
-    '--iv',
-    '866b1fdc9fdfee5675ea40264ab78ab5',
 ])]
 
 StormAAXC = [
