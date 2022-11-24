@@ -88,10 +88,11 @@ class Translator:
         return r
 
 
-def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: str, iv: str):
+def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: bytes, iv: bytes):
     def walk_mdat(translator: Translator, endPosition: int):  # samples
         startPosition = inStream.tell()
         while inStream.tell() < endPosition:
+            atomStart = inStream.tell()
             translator.reset()
             atomLength = translator.readAtomSize(inStream)
             atomTypePosition = translator.position()
@@ -105,6 +106,7 @@ def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: str
             translator.skipInt()  # trak number
             totalBlockSize = translator.getInt()  # total size of all blocks
             blockCount = translator.getInt()  # number of blocks
+            # atomEnd = atomStart + atomLength + totalBlockSize
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
@@ -135,11 +137,12 @@ def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: str
         t = translator
         while inStream.tell() < endPosition:
             # read an atom length.
-            translator.reset()
+            t.reset()
             atomStart = inStream.tell()
             atomLength = t.readAtomSize(inStream)
-            atom = t.readInt(inStream)
             atomEnd = atomStart + atomLength
+            ap = t.position()
+            atom = t.readInt(inStream)
 
             remaining = atomLength
 
@@ -164,17 +167,35 @@ def someFunc(inStream: io.BufferedReader, outStream: io.BufferedWriter, key: str
                 remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - \
                     walk_atoms(t, atomEnd)
+            elif atom == 0x6D657461:  # meta-4
+                t.readInto(inStream, 4)
+                remaining = remaining - \
+                    t.write_and_reset(outStream)
+                remaining = remaining - \
+                    walk_atoms(t, atomEnd)
+            elif atom == 0x73747364:  # stsd-8
+                t.readInto(inStream, 8)
+                remaining = remaining - \
+                    t.write_and_reset(outStream)
+                remaining = remaining - \
+                    walk_atoms(t, atomEnd)
             elif atom == 0x6d646174:  # mdat-none
                 remaining = remaining - t.write_and_reset(outStream)
                 remaining = remaining - \
                     walk_mdat(t, atomEnd)
-
+            elif atom == 0x61617664:  # aavd-variable
+                t.putInt(ap, 0x6d703461)  # mp4a
+                remaining = remaining - \
+                    t.write_and_reset(outStream)
+                # don't care about the children.
+                copy(inStream, remaining, outStream)
             else:
                 remaining = remaining - t.write_and_reset(outStream)
                 # don't care about the children.
                 copy(inStream, remaining, outStream)
-
         return endPosition - startPosition
+
+    walk_atoms(Translator(), os.path.getsize(inStream.name))
 
 
 def copy(inStream, length, *outs) -> int:
@@ -202,7 +223,7 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
     """
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
-            someFunc(src, dest, key, iv)
+            someFunc(src, dest, bytes.fromhex(key), bytes.fromhex(iv))
             # decrypter = AaxDecrypter(src, dest, key, iv)
             # decrypter.walk_atoms(Translator(), os.path.getsize(inpath))
 
