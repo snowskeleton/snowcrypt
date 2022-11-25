@@ -358,6 +358,7 @@ class MP4(TinyTag):
             b'mvhd': Parser.parse_mvhd,
             b'trak': {b'mdia': {b"minf": {b"stbl": {b"stsd": {
                 b'mp4a': Parser.parse_audio_sample_entry_mp4a,
+                b'aavd': Parser.parse_audio_sample_entry_mp4a,
                 b'alac': Parser.parse_audio_sample_entry_alac
             }}}}}
         }
