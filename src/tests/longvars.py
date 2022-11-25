@@ -4,8 +4,9 @@ import time
 def avg(list: list):
     try:
         list.sort()
-        list.pop(0)
-        list.pop(-1)
+        if len(list) > 3:
+            list.pop(0)
+            list.pop(-1)
         s = max(list)
         list = [float(i)/s for i in list]
         return sum(list) / len(list)
@@ -77,64 +78,15 @@ StormAAX = [
     'f1c443f8db16304d24edc1245e278eaf',
     '9024b63436da4986ec5ac1f56729c0e4',
 ]
+ControlEsperoAAX = [
+    'Espero_A_Silver_Ships_Novel-LC_64_22050_stereo.aax',
+    'The Gathering Storm: Interview with the Narrators-control.m4a',
+    '3bf90b36726bf44e540ea40ea34bd8df',
+    '8521b45c2f75c0153bbf7ce5e2e68fdd',
+]
 EsperoAAX = [
     'Espero_A_Silver_Ships_Novel-LC_64_22050_stereo.aax',
     'The Gathering Storm: Interview with the Narrators.m4a',
     '3bf90b36726bf44e540ea40ea34bd8df',
     '8521b45c2f75c0153bbf7ce5e2e68fdd',
 ]
-
-# hexToName = {
-#     0x61617664: {
-#         'name': 'aavd',
-#         'func': AaxDecrypter.case_aavd
-#     },
-#     0x6d703461: {
-#         'name': 'mp4a',
-#         'func': AaxDecrypter.case_default
-#     },
-#     0x6d6f6f76: {
-#         'name': 'moov-0',
-#         'func': AaxDecrypter.case_moov
-#     },
-#     0x7472616b: {
-#         'name': 'trak-0',
-#         'func': AaxDecrypter.case_trak
-#     },
-#     0x6d646961: {
-#         'name': 'mdia-0',
-#         'func': AaxDecrypter.case_mdia
-#     },
-#     0x6d696e66: {
-#         'name': 'minf-0',
-#         'func': AaxDecrypter.case_minf
-#     },
-#     0x7374626c: {
-#         'name': 'stbl-0',
-#         'func': AaxDecrypter.case_stbl
-#     },
-#     0x75647461: {
-#         'name': 'udta-0',
-#         'func': AaxDecrypter.case_udta
-#     },
-#     0x6D657461: {
-#         'name': 'meta-4',
-#         'func': AaxDecrypter.case_meta
-#     },
-#     0x73747364: {
-#         'name': 'stsd-8',
-#         'func': AaxDecrypter.case_stsd
-#     },
-#     0x66747970: {
-#         'name': 'ftyp-none',
-#         'func': AaxDecrypter.case_ftyp
-#     },
-#     0x6d646174: {
-#         'name': 'mdat-none',
-#         'func': AaxDecrypter.case_mdat
-#     },
-#     0x00000000: {
-#         'name': 'default',
-#         'func': AaxDecrypter.case_default
-#     }
-# }

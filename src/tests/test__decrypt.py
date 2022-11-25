@@ -19,10 +19,12 @@ def handler(*_):
 
 contestents = [{
     'func': newcrypt,
-    'args': StormAAXC,
+    # 'args': StormAAXC,
+    'args': EsperoAAX,
 }, {
     'func': oldcrypt,
-    'args': ControlStormAAXC
+    # 'args': ControlStormAAXC,
+    'args': ControlEsperoAAX,
 }]
 
 file1 = contestents[0]['args'][1]
@@ -40,22 +42,21 @@ class MyTestCases(unittest.TestCase):
         # print(run(contestents[num]['func'], contestents[num]['args']))
         try:
             signal.signal(signal.SIGALRM, handler)
-            signal.alarm(10)
-            one, two = race(contestents, 20)
+            signal.alarm(60)
+            one, two = race(contestents, 1)
             assert filecmp.cmp(file1, file2)
             one = str(one)[:5]
             two = str(two)[:5]
             print('new : ', one)
             print('old : ', two)
-            # print(int(two) - int(one))
         except AssertionError:
-            signal.alarm(0)          # Disable the alarm
             print('Files are not the same')
         except NotDecryptable:
             print('Decryption took too long')
         except KeyboardInterrupt:
             print('\nReceived escape sequence')
-
+        finally:
+            signal.alarm(0)          # Disable the alarm
 
 
 def main():
