@@ -66,7 +66,6 @@ class Translator:
     def _readLong(self, inStream: BufferedReader) -> int:
         return self._readOne(inStream, flong)
 
-    def _skipInt(self): self._skip(fint[1])
     def _skipLong(self): self._skip(flong[1])
     def _skip(self, length): self.pos = self.pos + length
 
@@ -92,10 +91,6 @@ class Translator:
         self._write(outStream)
 
 
-def _cipherGen(key, iv, count):
-    return [AES.new(key, AES.MODE_CBC, iv=iv) for _ in range(count)]
-
-
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
     def walk_mdat(endPosition: int):  # samples
         while inStream.tell() < endPosition:
@@ -107,32 +102,33 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
             # after the atom type comes 5 additional fields describing the data.
             # We only care about the last two.
             t._readInto(inStream, 20)
-            t._skipInt()  # time in ms
-            t._skipInt()  # first block index
-            t._skipInt()  # trak number
+            t.pos += 12  # skip time in ms, first block index, trak number
             totalBlockSize = t._getInt()  # total size of all blocks
             blockCount = t._getInt()  # number of blocks
-            # atomEnd = atomStart + atomLength + totalBlockSize
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
-            if atomType == 0x61617664:  # aavd
-                t._putInt(atomTypePosition, 0x6d703461)  # mp4a
+            if atomType == AAVD:
+                # replace aavd type with mp4a type
+                t._putInt(atomTypePosition, MP4A)
                 t._readInto(inStream, blockCount * 4)
                 t._write(outStream)
-                # def someFunc():
-                #     sampLeng = t._getInt()
-                #     decrypted = c.decrypt(inStream.read(sampLeng & 0xFFFFFFF0))
-                #     remaining = sampLeng - outStream.write(decrypted)
-                #     # fun fact, the last few bytes of each sample aren't encrypted!
-                #     _copy(inStream, remaining, outStream)
-                # map(someFunc, _cipherGen(key, iv, blockCount))
-                for c in _cipherGen(key, iv, blockCount):
-                    sampLeng = t._getInt()
-                    decrypted = c.decrypt(inStream.read(sampLeng & 0xFFFFFFF0))
-                    remaining = sampLeng - outStream.write(decrypted)
-                    # fun fact, the last few bytes of each sample aren't encrypted!
-                    _copy(inStream, remaining, outStream)
+
+                for _ in range(blockCount):
+                    # setup
+                    sampleLength = t._getInt()
+                    aes = AES.new(key, AES.MODE_CBC, iv=iv)
+
+                    # for cipher padding, (up to) last 2 bytes are unencrypted
+                    encryptedLength = sampleLength & 0xFFFFFFF0
+                    unencryptedLength = sampleLength & 0x0000000F
+
+                    encryptedData = inStream.read(encryptedLength)
+                    unencryptedData = inStream.read(unencryptedLength)
+
+                    outStream.write(aes.decrypt(encryptedData))
+                    outStream.write(unencryptedData)
+
             else:
                 length = t._write(outStream)
                 _copy(inStream, atomLength +
