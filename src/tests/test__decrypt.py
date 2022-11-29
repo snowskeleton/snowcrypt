@@ -1,14 +1,7 @@
-import sys
-import signal
-import os
 import filecmp
 import unittest
-import os
 from ..snowcrypt.snowcrypt import decrypt_aaxc as newcrypt
 from ..snowcrypt.oldcrypt import decrypt_aaxc as oldcrypt
-import time
-import cProfile
-import pstats
 
 from .longvars import *
 from ..snowcrypt.localExceptions import NotDecryptable
@@ -41,8 +34,7 @@ class MyTestCases(unittest.TestCase):
         # num = 0
         # print(run(contestents[num]['func'], contestents[num]['args']))
         try:
-            signal.signal(signal.SIGALRM, handler)
-            signal.alarm(60)
+            # TODO: implement scalene profiler
             one, two = race(contestents, 1)
             assert filecmp.cmp(file1, file2)
             one = str(one)[:5]
@@ -55,9 +47,17 @@ class MyTestCases(unittest.TestCase):
             print('Decryption took too long')
         except KeyboardInterrupt:
             print('\nReceived escape sequence')
-        finally:
-            signal.alarm(0)          # Disable the alarm
 
 
 def main():
     MyTestCases().test__decrypt_local()
+
+# b = bytes.fromhex
+# key = b('9dc2c84a37850c11699818605f47958c')
+# iv = b('256953b2feab2a04ae0180d8335bbed6')
+# plainText = b('2e586692e647f5028ec6fa47a55a2aab')
+# cipherText = b('1b1ebd1fc45ec43037fd4844241a437f')
+# from ..snowcrypt.aes import AES
+# aes = AES(key)
+# testing = aes.decrypt_cbc(cipherText, iv)
+# assert testing == plainText

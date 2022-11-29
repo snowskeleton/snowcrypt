@@ -4,7 +4,7 @@ from os import path
 from hashlib import sha1
 from io import BufferedReader, BufferedWriter
 
-from Crypto.Cipher import AES
+from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
 
 from .localExceptions import CredentialMismatch
@@ -118,7 +118,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                 for _ in range(blockCount):
                     # setup
                     sampleLength = t._getInt()
-                    aes = AES.new(key, AES.MODE_CBC, iv=iv)
+                    aes = newAES(key, MODE_CBC, iv=iv)
 
                     # for cipher padding, (up to) last 2 bytes are unencrypted
                     encryptedLength = sampleLength & 0xFFFFFFF0
@@ -127,7 +127,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                     encryptedData = inStream.read(encryptedLength)
                     unencryptedData = inStream.read(unencryptedLength)
 
-                    outStream.write(aes.decrypt(encryptedData))
+                    outStream.write(aes.decrypt_cbc(encryptedData, iv))
                     outStream.write(unencryptedData)
 
             else:
@@ -223,10 +223,10 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
     _bytes = activation_bytes
     im_key = _snowsha(fixedKey, bytes.fromhex(_bytes))
-    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))[:16]
+    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))  # [:16]
     key = im_key[:16]
     # decrypt drm blob to prove we can do it
-    cipher = AES.new(key, AES.MODE_CBC, iv=iv)
+    cipher = newAES(key, MODE_CBC, iv=iv)
     data = cipher.decrypt(_pad(_getAdrmBlob(inStream), 16))
     try:
         assert _snowsha(key, iv) == _getChecksum(inStream)
