@@ -1,55 +1,57 @@
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
-import struct
-import os
-import hashlib
-import io
+from struct import unpack_from, pack_into
+from os import path
+from hashlib import sha1
+from io import BufferedReader, BufferedWriter
 
-from Crypto.Cipher import AES
+from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
 
 from .localExceptions import CredentialMismatch
+from .atomTypes import *
+
+
+fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
 
 
 class Translator:
-    fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
-
-    def __init__(self, size=None):
+    def __init__(self, size: int = None):
         self.buf = bytearray(size if size != None else 4096)
         self.pos, self.wpos = 0, 0
 
     def reset(self):
         self.pos, self.wpos = 0, 0
 
-    def position(self): return self.pos
-    def getShort(self): return self.getOne(self.fshort)
-    def getInt(self): return self.getOne(self.fint)
-    def getLong(self): return self.getOne(self.flong)
-    def putInt(self, position, value): self.putOne(self.fint, position, value)
+    def _position(self) -> int: return self.pos
+    def _getShort(self) -> int: return self._getOne(fshort)
+    def _getInt(self) -> int: return self._getOne(fint)
+    def _getLong(self) -> int: return self._getOne(flong)
 
-    def getOne(self, format):
-        r = struct.unpack_from(format[0], self.buf, self.pos)[0]
+    def _putInt(self, position: int, value: int): self._putOne(
+        fint, position, value)
+
+    def _getOne(self, format: tuple):
+        r = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos = self.pos + format[1]
         return r
 
-    def putOne(self, format, position, value):
-        struct.pack_into(format[0], self.buf, position, value)
+    def _putOne(self, format: str | bytes, position: int, value):
+        pack_into(format[0], self.buf, position, value)
 
-    def readOne(self, inStream, format):
+    def _readOne(self, inStream: BufferedReader, format: str | bytes):
         length = format[1]
         self.buf[self.wpos: self.wpos + length] = inStream.read(length)
-        r = struct.unpack_from(format[0], self.buf, self.pos)[0]
+        r = unpack_from(format[0], self.buf, self.pos)[0]
         self.wpos = self.wpos + length
         self.pos = self.pos + length
         return r
 
-    def readInto(self, inStream, length) -> int:
+    def _readInto(self, inStream: BufferedReader, length: int | None) -> int:
         self.buf[self.wpos: self.wpos + length] = inStream.read(length)
         self.wpos = self.wpos + length
         return length
 
-    def readCount(self) -> int: return self.wpos
-
-    def write(self, *outs) -> int:
+    def _write(self, *outs: list[BufferedWriter]) -> int:
         if self.wpos > 0:
             # fuck you python and your write function that can't sublist!
             data = self.buf if self.wpos == len(
@@ -59,182 +61,121 @@ class Translator:
             return self.wpos
         return 0
 
-    def readInt(self, inStream):
-        return self.readOne(inStream, self.fint)
+    def _readInt(self, inStream: BufferedReader) -> int:
+        return self._readOne(inStream, fint)
 
-    def readLong(self, inStream):
-        return self.readOne(inStream, self.flong)
+    def _readLong(self, inStream: BufferedReader) -> int:
+        return self._readOne(inStream, flong)
 
-    def skipInt(self): self.skip(self.fint[1])
-    def skipLong(self): self.skip(self.flong[1])
-    def skip(self, length): self.pos = self.pos + length
+    def _skipLong(self): self._skip(flong[1])
+    def _skip(self, length: int): self.pos += length
 
-    def readAtomSize(self, inStream):
-        atomLength = self.readInt(inStream)
-        return atomLength if atomLength != 1 else self.readLong(inStream)
+    def _readAtomSize(self, inStream: BufferedReader) -> int:
+        atomLength = self._readInt(inStream)
+        return atomLength if atomLength != 1 else self._readLong(inStream)
 
-    def zero(self, start=0, end=None):
-        if end == None:
-            end = self.wpos
-        for i in range(start, end):
+    def _zero(self, start: int = 0, end: int = None):
+        for i in range(start, end if end else self.wpos):
             self.buf[i] = 0
 
-    def write_and_reset(self, *outs) -> int:
-        r = self.write(*outs)
-        self.reset()
-        return r
+    def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
+        length = self._readInto(inStream, remaining)
+        self._putInt(0,  M4A)
+        self._putInt(4,  VERSION2_0)
+        self._putInt(8,  ISO2)
+        self._putInt(12, M4B)
+        self._putInt(16, MP42)
+        self._putInt(20, ISOM)
+        self._zero(24, length)
+        self._write(outStream)
 
 
-class AaxDecrypter:
-    filetypes = {6: "html", 7: "xml", 12: "gif",
-                 13: "jpg", 14: "png", 15: "url", 27: "bmp"}
-
-    def __init__(self, inStream, outStream, key, iv):
-        self.key = bytes.fromhex(key)
-        self.iv = bytes.fromhex(iv)
-        self.inStream = inStream
-        self.outStream = outStream
-
-    def walk_mdat(self, translator, endPosition):  # samples
-        inStream = self.inStream
-        outStream = self.outStream
-        startPosition = inStream.tell()
-        # It's illegal for mdat to contain atoms... but that didn't stop Audible! Not that any parsers care.
+def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
+    def walk_mdat(endPosition: int):  # samples
         while inStream.tell() < endPosition:
-            # self.status(inStream.tell(), self.filesize)
-            # read an atom length.
-            atomStart = inStream.tell()
-            translator.reset()
-            atomLength = translator.readAtomSize(inStream)
-            atomTypePosition = translator.position()
-            atomType = translator.readInt(inStream)
+            t = Translator()
+            atomLength = t._readAtomSize(inStream)
+            atomTypePosition = t._position()
+            atomType = t._readInt(inStream)
 
             # after the atom type comes 5 additional fields describing the data.
             # We only care about the last two.
-            translator.readInto(inStream, 20)
-            translator.skipInt()  # time in ms
-            translator.skipInt()  # first block index
-            translator.skipInt()  # trak number
-            totalBlockSize = translator.getInt()  # total size of all blocks
-            blockCount = translator.getInt()  # number of blocks
-
-            atomEnd = atomStart + atomLength + totalBlockSize
+            t._readInto(inStream, 20)
+            t.pos += 12  # skip time in ms, first block index, trak number
+            totalBlockSize = t._getInt()  # total size of all blocks
+            blockCount = t._getInt()  # number of blocks
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
-            if (atomType == 0x61617664):
-                translator.putInt(atomTypePosition, 0x6d703461)  # mp4a
-                translator.readInto(inStream, blockCount * 4)
-                translator.write(outStream)
+            if atomType == AAVD:
+                # replace aavd type with mp4a type
+                t._putInt(atomTypePosition, MP4A)
+                t._readInto(inStream, blockCount * 4)
+                t._write(outStream)
+
                 for _ in range(blockCount):
-                    # self.status(inStream.tell(),  self.filesize)
-                    sampleLength = translator.getInt()
-                    # has to be reset every go round.
-                    cipher = AES.new(self.key, AES.MODE_CBC, iv=self.iv)
-                    remaining = sampleLength - \
-                        outStream.write(cipher.decrypt(
-                            inStream.read(sampleLength & 0xFFFFFFF0)))
-                    # fun fact, the last few bytes of each sample aren't encrypted!
-                    if remaining > 0:
-                        self.copy(inStream, remaining, outStream)
+                    # setup
+                    sampleLength = t._getInt()
+                    aes = newAES(key, MODE_CBC, iv=iv)
+
+                    # for cipher padding, (up to) last 2 bytes are unencrypted
+                    encryptedLength = sampleLength & 0xFFFFFFF0
+                    unencryptedLength = sampleLength & 0x0000000F
+
+                    encryptedData = inStream.read(encryptedLength)
+                    unencryptedData = inStream.read(unencryptedLength)
+
+                    outStream.write(aes.decrypt(encryptedData))
+                    outStream.write(unencryptedData)
+
             else:
-                len = translator.write_and_reset(outStream)
-                self.copy(inStream, atomLength +
-                          totalBlockSize - len, outStream)
-            translator.reset()
-            self.checkPosition(atomEnd)
+                length = t._write(outStream)
+                _copy(inStream, atomLength +
+                      totalBlockSize - length, outStream)
 
-        return endPosition - startPosition
-
-    def walk_atoms(self, translator, endPosition):  # everything
-        inStream = self.inStream
-        outStream = self.outStream
-        startPosition = inStream.tell()
+    def walk_atoms(endPosition: int):  # everything
         while inStream.tell() < endPosition:
-            # self.status(inStream.tell(), self.filesize)
-            # read an atom length.
-            translator.reset()
+            t = Translator()
             atomStart = inStream.tell()
-            atomLength = translator.readAtomSize(inStream)
+            atomLength = t._readAtomSize(inStream)
             atomEnd = atomStart + atomLength
-            ap = translator.position()
-            atom = translator.readInt(inStream)
+            atomPosition = t._position()
+            atomType = t._readInt(inStream)
 
             remaining = atomLength
 
-            if atom == 0x66747970:  # ftyp-none
-                remaining = remaining - translator.write_and_reset(outStream)
-                len = translator.readInto(inStream, remaining)
-                translator.putInt(0,  0x4D344120)  # "M4A "
-                translator.putInt(4,  0x00000200)  # version 2.0?
-                translator.putInt(8,  0x69736F32)  # "iso2"
-                translator.putInt(12, 0x4D344220)  # "M4B "
-                translator.putInt(16, 0x6D703432)  # "mp42"
-                translator.putInt(20, 0x69736F6D)  # "isom"
-                translator.zero(24, len)
-                remaining = remaining - \
-                    translator.write_and_reset(outStream)
-            elif atom == 0x6d6f6f76 \
-                    or atom == 0x7472616b \
-                    or atom == 0x6d646961 \
-                    or atom == 0x6d696e66 \
-                    or atom == 0x7374626c \
-                    or atom == 0x75647461:  # moov-0, trak-0, mdia-0, minf-0, stbl-0, udta-0
-                remaining = remaining - translator.write_and_reset(outStream)
-                remaining = remaining - \
-                    self.walk_atoms(translator, atomEnd)
-            elif atom == 0x6D657461:  # meta-4
-                translator.readInto(inStream, 4)
-                remaining = remaining - \
-                    translator.write_and_reset(outStream)
-                remaining = remaining - \
-                    self.walk_atoms(translator, atomEnd)
-            elif atom == 0x73747364:  # stsd-8
-                translator.readInto(inStream, 8)
-                remaining = remaining - \
-                    translator.write_and_reset(outStream)
-                remaining = remaining - \
-                    self.walk_atoms(translator, atomEnd)
-            elif atom == 0x6d646174:  # mdat-none
-                remaining = remaining - translator.write_and_reset(outStream)
-                remaining = remaining - \
-                    self.walk_mdat(translator, atomEnd)
-            elif atom == 0x61617664:  # aavd-variable
-                translator.putInt(ap, 0x6d703461)  # mp4a
-                remaining = remaining - \
-                    translator.write_and_reset(outStream)
-                # don't care about the children.
-                self.copy(inStream, remaining, outStream)
+            if atomType == FTYP:
+                remaining -= t._write(outStream)
+                t.reset()
+                t._fillFtyp(inStream, remaining, outStream)
+            elif atomType == META:
+                t._readInto(inStream, 4)
+                t._write(outStream)
+                walk_atoms(atomEnd)
+            elif atomType == STSD:
+                t._readInto(inStream, 8)
+                t._write(outStream)
+                walk_atoms(atomEnd)
+            elif atomType == MDAT:
+                t._write(outStream)
+                walk_mdat(atomEnd)
+            elif atomType == AAVD:
+                t._putInt(atomPosition, 0x6d703461)  # mp4a
+                remaining -= t._write(outStream)
+                _copy(inStream, remaining, outStream)
+            elif atomType == MOOV \
+                    or atomType == TRAK \
+                    or atomType == MDIA \
+                    or atomType == MINF \
+                    or atomType == STBL \
+                    or atomType == UDTA:
+                t._write(outStream)
+                walk_atoms(atomEnd)
             else:
-                remaining = remaining - translator.write_and_reset(outStream)
-                # don't care about the children.
-                self.copy(inStream, remaining, outStream)
+                remaining -= t._write(outStream)
+                _copy(inStream, remaining, outStream)
 
-            self.checkPosition(atomEnd)
-
-        # self.status(inStream.tell(), self.filesize)
-        return endPosition - startPosition
-
-    def status(self, position, filesize):
-        None
-
-    def copy(self, inStream, length, *outs) -> int:
-        remaining = length
-        while remaining > 0:
-            remaining = remaining - \
-                self.write(inStream.read(min(remaining, 4096)), *outs)
-        return length
-
-    def write(self, buf, *outs) -> int:
-        for out in outs:
-            out.write(buf)
-        return len(buf)
-
-    def checkPosition(self, position):
-        ip = self.inStream.tell()
-        op = self.outStream.tell()
-        if ip != op or ip != position:
-            print("IP: %d\tOP: %d\tP: %d" % (ip, op, position))
+    walk_atoms(path.getsize(inStream.name))
 
 
 def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
@@ -246,10 +187,11 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
         key (int): AES key
         iv (int): AES initialization vector
     """
+    key = bytes.fromhex(key)
+    iv = bytes.fromhex(iv)
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
-            decrypter = AaxDecrypter(src, dest, key, iv)
-            decrypter.walk_atoms(Translator(), os.path.getsize(inpath))
+            _decrypt(src, dest, key, iv)
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
@@ -266,11 +208,11 @@ def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
     decrypt_aaxc(inpath, outpath, key, iv)
 
 
-def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
-    """derive key and initialization vector for given io.BufferReader
+def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
+    """derive key and initialization vector for given BufferReader
 
     Args:
-        inStream (io.BufferedReader): open file stream
+        inStream (BufferedReader): open file stream
         activation_bytes (str): decryption bytes unique to your account
 
     Returns:
@@ -279,10 +221,10 @@ def deriveKeyIV(inStream: io.BufferedReader, activation_bytes: str):
     fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
     _bytes = activation_bytes
     im_key = _snowsha(fixedKey, bytes.fromhex(_bytes))
-    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))[:16]
+    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))  # [:16]
     key = im_key[:16]
     # decrypt drm blob to prove we can do it
-    cipher = AES.new(key, AES.MODE_CBC, iv=iv)
+    cipher = newAES(key, MODE_CBC, iv=iv)
     data = cipher.decrypt(_pad(_getAdrmBlob(inStream), 16))
     try:
         assert _snowsha(key, iv) == _getChecksum(inStream)
@@ -320,11 +262,11 @@ def _getDrm(data: bytes):
     return data[26:42]
 
 
-def _getAdrmBlob(inStream: io.BufferedReader):
+def _getAdrmBlob(inStream: BufferedReader):
     """read ADRM from inStream
 
     Args:
-        inStream (io.BufferReader): an open file stream
+        inStream (BufferReader): an open file stream
 
     Returns:
         int: adrm blob
@@ -333,11 +275,11 @@ def _getAdrmBlob(inStream: io.BufferedReader):
     return inStream.read(56)
 
 
-def _getChecksum(inStream: io.BufferedReader):
+def _getChecksum(inStream: BufferedReader):
     """read file checksum from inStream
 
     Args:
-        inStream (io.BufferReader): an open file stream
+        inStream (BufferReader): an open file stream
 
     Returns:
         int: checksum
@@ -382,7 +324,7 @@ def _snowsha(*bits: bytes, length: int = None):
     Returns:
         bytes: sha digest
     """
-    return hashlib.sha1(b''.join(bits)).digest()[:length]
+    return sha1(b''.join(bits)).digest()[:length]
 
 
 def _pad(data: bytes, length: int = 16) -> bytes:
@@ -398,3 +340,17 @@ def _pad(data: bytes, length: int = 16) -> bytes:
     """
     length = length - (len(data) % length)
     return data + bytes([length])*length
+
+
+def _copy(inStream: BufferedReader, length: int, *outs) -> int:
+    remaining = length
+    while remaining > 0:
+        remaining -= \
+            __write(inStream.read(min(remaining, 4096)), *outs)
+    return length
+
+
+def __write(buf, *outs: list[BufferedWriter]) -> int:
+    for out in outs:
+        out.write(buf)
+    return len(buf)
