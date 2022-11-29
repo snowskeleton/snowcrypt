@@ -127,7 +127,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                     encryptedData = inStream.read(encryptedLength)
                     unencryptedData = inStream.read(unencryptedLength)
 
-                    outStream.write(aes.decrypt_cbc(encryptedData, iv))
+                    outStream.write(aes.decrypt(encryptedData))
                     outStream.write(unencryptedData)
 
             else:
