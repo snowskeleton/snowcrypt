@@ -15,7 +15,7 @@ fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
 
 
 class Translator:
-    def __init__(self, size=None):
+    def __init__(self, size: int = None):
         self.buf = bytearray(size if size != None else 4096)
         self.pos, self.wpos = 0, 0
 
@@ -30,7 +30,7 @@ class Translator:
     def _putInt(self, position: int, value: int): self._putOne(
         fint, position, value)
 
-    def _getOne(self, format):
+    def _getOne(self, format: tuple):
         r = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos = self.pos + format[1]
         return r
@@ -51,7 +51,7 @@ class Translator:
         self.wpos = self.wpos + length
         return length
 
-    def _write(self, *outs) -> int:
+    def _write(self, *outs: list[BufferedWriter]) -> int:
         if self.wpos > 0:
             # fuck you python and your write function that can't sublist!
             data = self.buf if self.wpos == len(
@@ -68,19 +68,17 @@ class Translator:
         return self._readOne(inStream, flong)
 
     def _skipLong(self): self._skip(flong[1])
-    def _skip(self, length): self.pos = self.pos + length
+    def _skip(self, length: int): self.pos += length
 
     def _readAtomSize(self, inStream: BufferedReader) -> int:
         atomLength = self._readInt(inStream)
         return atomLength if atomLength != 1 else self._readLong(inStream)
 
-    def _zero(self, start=0, end=None):
-        if end == None:
-            end = self.wpos
-        for i in range(start, end):
+    def _zero(self, start: int = 0, end: int = None):
+        for i in range(start, end if end else self.wpos):
             self.buf[i] = 0
 
-    def _fillFtyp(self, inStream, remaining, outStream):
+    def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
         length = self._readInto(inStream, remaining)
         self._putInt(0,  M4A)
         self._putInt(4,  VERSION2_0)
@@ -352,7 +350,7 @@ def _copy(inStream: BufferedReader, length: int, *outs) -> int:
     return length
 
 
-def __write(buf, *outs) -> int:
+def __write(buf, *outs: list[BufferedWriter]) -> int:
     for out in outs:
         out.write(buf)
     return len(buf)

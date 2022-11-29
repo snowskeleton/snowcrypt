@@ -12,12 +12,12 @@ def handler(*_):
 
 contestents = [{
     'func': newcrypt,
-    # 'args': StormAAXC,
-    'args': EsperoAAX,
+    'args': StormAAXC,
+    # 'args': EsperoAAX,
 }, {
     'func': oldcrypt,
-    # 'args': ControlStormAAXC,
-    'args': ControlEsperoAAX,
+    'args': ControlStormAAXC,
+    # 'args': ControlEsperoAAX,
 }]
 
 file1 = contestents[0]['args'][1]
