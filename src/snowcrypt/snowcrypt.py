@@ -27,9 +27,6 @@ class Translator:
     def _getInt(self) -> int: return self._getOne(fint)
     def _getLong(self) -> int: return self._getOne(flong)
 
-    def _putInt(self, position: int, value: int): self._putOne(
-        fint, position, value)
-
     def _getOne(self, format: tuple):
         r = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos = self.pos + format[1]
@@ -80,12 +77,12 @@ class Translator:
 
     def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
         length = self._readInto(inStream, remaining)
-        self._putInt(0,  TYPES.M4A)
-        self._putInt(4,  TYPES.VERSION2_0)
-        self._putInt(8,  TYPES.ISO2)
-        self._putInt(12, TYPES.M4B)
-        self._putInt(16, TYPES.MP42)
-        self._putInt(20, TYPES.ISOM)
+        self._putOne(fint, 0,  TYPES.M4A)
+        self._putOne(fint, 4,  TYPES.VERSION2_0)
+        self._putOne(fint, 8,  TYPES.ISO2)
+        self._putOne(fint, 12, TYPES.M4B)
+        self._putOne(fint, 16, TYPES.MP42)
+        self._putOne(fint, 20, TYPES.ISOM)
         self._zero(24, length)
         self._write(outStream)
 
@@ -109,7 +106,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
             # aavd has a list of sample sizes and then the samples.
             if atomType == TYPES.AAVD:
                 # replace aavd type with mp4a type
-                t._putInt(atomTypePosition, TYPES.MP4A)
+                t._putOne(fint, atomTypePosition, TYPES.MP4A)
                 t._readInto(inStream, blockCount * 4)
                 t._write(outStream)
 
@@ -160,7 +157,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                 t._write(outStream)
                 walk_mdat(atomEnd)
             elif atomType == TYPES.AAVD:
-                t._putInt(atomPosition, TYPES.MP4A)  # mp4a
+                t._putOne(fint, atomPosition, TYPES.MP4A)  # mp4a
                 remaining -= t._write(outStream)
                 _copy(inStream, remaining, outStream)
             elif atomType == TYPES.MOOV \
