@@ -8,7 +8,7 @@ from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
 
 from .localExceptions import CredentialMismatch
-from .atomTypes import TYPES
+from .constants import *
 
 
 fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
@@ -50,12 +50,12 @@ class Translator:
         self._readInto(inStream, remaining)
         self.wpos += length
         buf = bytearray(remaining)
-        pack_into(fint[0], buf, 0,  TYPES.M4A)
-        pack_into(fint[0], buf, 4,  TYPES.VERSION2_0)
-        pack_into(fint[0], buf, 8,  TYPES.ISO2)
-        pack_into(fint[0], buf, 12, TYPES.M4B)
-        pack_into(fint[0], buf, 16, TYPES.MP42)
-        pack_into(fint[0], buf, 20, TYPES.ISOM)
+        pack_into(fint[0], buf, 0,  M4A)
+        pack_into(fint[0], buf, 4,  VERSION2_0)
+        pack_into(fint[0], buf, 8,  ISO2)
+        pack_into(fint[0], buf, 12, M4B)
+        pack_into(fint[0], buf, 16, MP42)
+        pack_into(fint[0], buf, 20, ISOM)
         # pack_into(format[0], buffer, position, value)
         for i in range(24, length):
             buf[i] = 0
@@ -81,9 +81,9 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
-            if atomType == TYPES.AAVD:
+            if atomType == AAVD:
                 # replace aavd type with mp4a type
-                pack_into(fint[0], t.buf,  atomTypePosition, TYPES.MP4A)
+                pack_into(fint[0], t.buf,  atomTypePosition, MP4A)
                 t._readInto(inStream, blockCount * 4)
                 t._write(t.buf, outStream)
 
@@ -119,31 +119,31 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
 
             remaining = atomLength
 
-            if atomType == TYPES.FTYP:
+            if atomType == FTYP:
                 remaining -= t._write(t.buf, outStream)
                 t.pos, t.wpos = 0, 0
                 t._fillFtyp(inStream, remaining, outStream)
-            elif atomType == TYPES.META:
+            elif atomType == META:
                 t._readInto(inStream, 4)
                 t._write(t.buf, outStream)
                 walk_atoms(atomEnd)
-            elif atomType == TYPES.STSD:
+            elif atomType == STSD:
                 t._readInto(inStream, 8)
                 t._write(t.buf, outStream)
                 walk_atoms(atomEnd)
-            elif atomType == TYPES.MDAT:
+            elif atomType == MDAT:
                 t._write(t.buf, outStream)
                 walk_mdat(atomEnd)
-            elif atomType == TYPES.AAVD:
-                pack_into(fint[0], t.buf, atomPosition, TYPES.MP4A)  # mp4a
+            elif atomType == AAVD:
+                pack_into(fint[0], t.buf, atomPosition, MP4A)  # mp4a
                 remaining -= t._write(t.buf, outStream)
                 _copy(inStream, remaining, outStream)
-            elif atomType in (TYPES.MOOV,
-                              TYPES.TRAK,
-                              TYPES.MDIA,
-                              TYPES.MINF,
-                              TYPES.STBL,
-                              TYPES.UDTA):
+            elif atomType in (MOOV,
+                              TRAK,
+                              MDIA,
+                              MINF,
+                              STBL,
+                              UDTA):
                 t._write(t.buf, outStream)
                 walk_atoms(atomEnd)
             else:
@@ -195,124 +195,57 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     """
     fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
     _bytes = activation_bytes
-    im_key = _snowsha(fixedKey, bytes.fromhex(_bytes))
-    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))  # [:16]
+    im_key = _sha(fixedKey, bytes.fromhex(_bytes))
+    iv = _sha(fixedKey, im_key, bytes.fromhex(_bytes))  # [:16]
     key = im_key[:16]
     # decrypt drm blob to prove we can do it
     cipher = newAES(key, MODE_CBC, iv=iv)
-    data = cipher.decrypt(_pad(_getAdrmBlob(inStream), 16))
-    try:
-        assert _snowsha(key, iv) == _getChecksum(inStream)
-        assert _swapEndien(_bts(data[:4])) == _bytes
-    except AssertionError:
+    data = cipher.decrypt(_getAdrmBlob(inStream))
+    # check to make sure we haven't misciphered anything up till now
+    validDrmChecksum = _sha(key, iv) != _getChecksum(inStream)
+    activation_bytes_match = _swapEndien(_bts(data[:4])) == _bytes
+    if not validDrmChecksum or not activation_bytes_match:
         raise CredentialMismatch('Either the activation bytes are incorrect'
                                  ' or the audio file is invalid or corrupt.')
-    # if we didn't raise any exceptions, then this file can
-    # be decrypted with the provided activation_bytes
-    fileKey = _getKey(data)
-    fileDrm = _getDrm(data)
-    inVect = _snowsha(fileDrm, fileKey, fixedKey)[:16]
+    fileKey = key_mask(data)
+    fileDrm = drm_mask(data)
+    inVect = _sha(fileDrm, fileKey, fixedKey, length=16)
     return _bts(fileKey), _bts(inVect)
 
 
-def _getKey(data: bytes):
-    """
-    Args:
-        data (bytes): decrypted adrmBlob
-
-    Returns:
-        bytes: final AES decryption key
-    """
+def key_mask(data: bytes):
     return data[8:24]
 
 
-def _getDrm(data: bytes):
-    """
-    Args:
-        data (bytes): decrypted adrmBlob
-
-    Returns:
-        bytes: sha key derivation piece from drm blob
-    """
+def drm_mask(data: bytes):
     return data[26:42]
 
 
 def _getAdrmBlob(inStream: BufferedReader):
-    """read ADRM from inStream
-
-    Args:
-        inStream (BufferReader): an open file stream
-
-    Returns:
-        int: adrm blob
-    """
-    inStream.seek(0x251)
-    return inStream.read(56)
+    inStream.seek(ADRM_START)
+    return _pad_16(inStream.read(ADRM_LENGTH))
 
 
 def _getChecksum(inStream: BufferedReader):
-    """read file checksum from inStream
-
-    Args:
-        inStream (BufferReader): an open file stream
-
-    Returns:
-        int: checksum
-    """
-    inStream.seek(0x28d)
+    inStream.seek(CKSM_START)
     return inStream.read(20)
 
 
 def _swapEndien(string: str):
-    """return bytes-like string with swapped endian
-    turns 12345678 into 78563412
-
-    Args:
-        string (str): hex string
-
-    Returns:
-        str: reversed string
+    """turns 12345678 into 78563412
     """
     return "".join(map(str.__add__, string[-2::-2], string[-1::-2]))
 
 
 def _bts(bytes: bytes) -> str:
-    """convenience function for cleaning up values
-
-    Args:
-        bytes (bytes): bytes-like object we want as string
-
-    Returns:
-        str: stringy bytes
-    """
-    # turns "b'bytes'"" into "hexstring"
     return str(hexlify(bytes)).strip("'")[2:]
 
 
-def _snowsha(*bits: bytes, length: int = None):
-    """convenience function for deriving keys
-
-    Args:
-        bits (bytes): input data for sha hash
-        length (int, optional): return only first length characters. Defaults to None (which is All)
-
-    Returns:
-        bytes: sha digest
-    """
+def _sha(*bits: bytes, length: int = None):
     return sha1(b''.join(bits)).digest()[:length]
 
 
-def _pad(data: bytes, length: int = 16) -> bytes:
-    """pad data to nearest length multiple
-
-    Args:
-        data (bytes): byte data
-        length (int, optional): Length to pad to. Defaults to 16
-
-    Returns:
-        bytes: same bytes appended with N additional bytes of value N,
-        where N is len(data) modulus length
-    """
+def _pad_16(data: bytes, length: int) -> bytes:
     length = length - (len(data) % length)
     return data + bytes([length])*length
 
