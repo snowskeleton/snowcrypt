@@ -14,20 +14,28 @@ from .atomTypes import TYPES
 fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
 
 
+def _putOne(format: tuple, buffer: bytearray, position: int, value):
+    pack_into(format[0], buffer, position, value)
+
+
+def _geetOne(format: tuple, buffer, position):
+    r = unpack_from(format[0], buffer, position)[0]
+    return r
+
 class Translator:
     def __init__(self, size: int = None):
         self.buf = bytearray(size if size != None else 4096)
         self.pos, self.wpos = 0, 0
 
-    def _getOne(self, format: tuple):
-        r = unpack_from(format[0], self.buf, self.pos)[0]
-        self.pos = self.pos + format[1]
+    def _geetOne(self, format: tuple, buffer, *_):
+        length = format[1]
+        r = unpack_from(format[0], buffer, self.pos)[0]
+        self.pos = self.pos + length
         return r
 
-    def _putOne(self, format: str or bytes, position: int, value):
-        pack_into(format[0], self.buf, position, value)
-
-    def _readOne(self, format: str or bytes, inStream: BufferedReader):
+    def _readOne(self, format: tuple, inStream: BufferedReader):
+        """convenience function to call _readInto for tuple[1] length
+        """
         length = format[1]
         self._readInto(inStream, length, reset=False)
         r = unpack_from(format[0], self.buf, self.pos)[0]
@@ -57,12 +65,12 @@ class Translator:
 
     def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
         length = self._readInto(inStream, remaining)
-        self._putOne(fint, 0,  TYPES.M4A)
-        self._putOne(fint, 4,  TYPES.VERSION2_0)
-        self._putOne(fint, 8,  TYPES.ISO2)
-        self._putOne(fint, 12, TYPES.M4B)
-        self._putOne(fint, 16, TYPES.MP42)
-        self._putOne(fint, 20, TYPES.ISOM)
+        _putOne(fint, self.buf, 0,  TYPES.M4A)
+        _putOne(fint, self.buf, 4,  TYPES.VERSION2_0)
+        _putOne(fint, self.buf, 8,  TYPES.ISO2)
+        _putOne(fint, self.buf, 12, TYPES.M4B)
+        _putOne(fint, self.buf, 16, TYPES.MP42)
+        _putOne(fint, self.buf, 20, TYPES.ISOM)
         for i in range(24, length):
             self.buf[i] = 0
         self._write(outStream)
@@ -80,20 +88,23 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
             # We only care about the last two.
             t._readInto(inStream, 20)
             t.pos += 12  # skip time in ms, first block index, trak number
-            totalBlockSize = t._getOne(fint)  # total size of all blocks
-            blockCount = t._getOne(fint)  # number of blocks
+            # total size of all blocks
+            totalBlockSize = _geetOne(fint, t.buf, t.pos)
+            t.pos += fint[1]
+            blockCount = _geetOne(fint, t.buf, t.pos)  # number of blocks
+            t.pos += fint[1]
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
             if atomType == TYPES.AAVD:
                 # replace aavd type with mp4a type
-                t._putOne(fint, atomTypePosition, TYPES.MP4A)
+                _putOne(fint, t.buf,  atomTypePosition, TYPES.MP4A)
                 t._readInto(inStream, blockCount * 4)
                 t._write(outStream)
 
                 for _ in range(blockCount):
                     # setup
-                    sampleLength = t._getOne(fint)
+                    sampleLength = t._geetOne(fint, t.buf)
                     aes = newAES(key, MODE_CBC, iv=iv)
 
                     # for cipher padding, (up to) last 2 bytes are unencrypted
@@ -138,7 +149,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                 t._write(outStream)
                 walk_mdat(atomEnd)
             elif atomType == TYPES.AAVD:
-                t._putOne(fint, atomPosition, TYPES.MP4A)  # mp4a
+                _putOne(fint, t.buf, atomPosition, TYPES.MP4A)  # mp4a
                 remaining -= t._write(outStream)
                 _copy(inStream, remaining, outStream)
             elif atomType == TYPES.MOOV \
