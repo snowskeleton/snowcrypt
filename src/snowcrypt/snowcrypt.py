@@ -19,11 +19,6 @@ class Translator:
         self.buf = bytearray(size if size != None else 4096)
         self.pos, self.wpos = 0, 0
 
-    def reset(self):
-        self.pos, self.wpos = 0, 0
-
-    def _position(self) -> int: return self.pos
-
     def _getOne(self, format: tuple):
         r = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos = self.pos + format[1]
@@ -34,15 +29,16 @@ class Translator:
 
     def _readOne(self, format: str or bytes, inStream: BufferedReader):
         length = format[1]
-        self.buf[self.wpos: self.wpos + length] = inStream.read(length)
+        self._readInto(inStream, length, reset=False)
         r = unpack_from(format[0], self.buf, self.pos)[0]
         self.wpos = self.wpos + length
         self.pos = self.pos + length
         return r
 
-    def _readInto(self, inStream: BufferedReader, length: int | None) -> int:
+    def _readInto(self, inStream: BufferedReader, length: int | None, reset: bool = True) -> int:
         self.buf[self.wpos: self.wpos + length] = inStream.read(length)
-        self.wpos = self.wpos + length
+        if reset:
+            self.wpos = self.wpos + length
         return length
 
     def _write(self, *outs: list[BufferedWriter]) -> int:
@@ -131,7 +127,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
 
             if atomType == TYPES.FTYP:
                 remaining -= t._write(outStream)
-                t.reset()
+                t.pos, t.wpos = 0, 0
                 t._fillFtyp(inStream, remaining, outStream)
             elif atomType == TYPES.META:
                 t._readInto(inStream, 4)
