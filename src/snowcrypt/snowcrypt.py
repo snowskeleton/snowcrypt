@@ -138,12 +138,12 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                 pack_into(fint[0], t.buf, atomPosition, TYPES.MP4A)  # mp4a
                 remaining -= t._write(t.buf, outStream)
                 _copy(inStream, remaining, outStream)
-            elif atomType == TYPES.MOOV \
-                    or atomType == TYPES.TRAK \
-                    or atomType == TYPES.MDIA \
-                    or atomType == TYPES.MINF \
-                    or atomType == TYPES.STBL \
-                    or atomType == TYPES.UDTA:
+            elif atomType in (TYPES.MOOV,
+                              TYPES.TRAK,
+                              TYPES.MDIA,
+                              TYPES.MINF,
+                              TYPES.STBL,
+                              TYPES.UDTA):
                 t._write(t.buf, outStream)
                 walk_atoms(atomEnd)
             else:
