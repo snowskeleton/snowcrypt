@@ -14,59 +14,41 @@ from .atomTypes import TYPES
 fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
 
 
-def _geetOne(format: tuple, buffer, position):
-    r = unpack_from(format[0], buffer, position)[0]
-    return r
-
-
-def _write(inBuf, *outs: list[BufferedWriter]) -> int:
-    # fuck you python and your write function that can't sublist!
-    data = inBuf
-    for out in outs:
-        return out.write(data)
-    return
-
-
 class Translator:
     def __init__(self, size: int = None):
         self.buf = bytearray(size if size != None else 4096)
         self.pos, self.wpos = 0, 0
 
+    def _next(self, format: tuple):
+        return unpack_from(format[0], self.buf, self.pos)[0]
+
     def _readOne(self, format: tuple, inStream: BufferedReader):
-        """convenience function to call _readInto for tuple[1] length
-        """
         length = format[1]
-        self._readInto(inStream, length, reset=False)
-        r = unpack_from(format[0], self.buf, self.pos)[0]
-        self.wpos = self.wpos + length
-        self.pos = self.pos + length
+        self._readInto(inStream, length)
+        r = self._next(format)
+        self.pos += length
         return r
 
-    def _readInto(self, inStream: BufferedReader, length: int | None, reset: bool = True) -> int:
-        self.buf[self.wpos: self.wpos + length] = inStream.read(length)
-        if reset:
-            self.wpos = self.wpos + length
+    def _readInto(self, inStream: BufferedReader, length: int | None) -> int:
+        start = self.wpos
+        end = start + length
+        self.buf[start:end] = inStream.read(length)
+        self.wpos += length
         return length
 
-    def _write(self, inStream, *outs: list[BufferedWriter]) -> int:
-        if self.wpos > 0:
-            # fuck you python and your write function that can't sublist!
-
-            if self.wpos == len(inStream):
-                data = inStream
-            else:
-                data = inStream[0: self.wpos]
-            for out in outs:
-                out.write(data)
-            return self.wpos
-        return 0
+    def _write(self, inStream, out: BufferedWriter) -> int:
+        data = inStream[0: self.wpos]
+        out.write(data)
+        return self.wpos
 
     def _readAtomSize(self, inStream: BufferedReader) -> int:
         atomLength = self._readOne(fint, inStream)
         return atomLength if atomLength != 1 else self._readOne(flong, inStream)
 
     def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
-        length = self._readInto(inStream, remaining)
+        length = remaining
+        self._readInto(inStream, remaining)
+        self.wpos += length
         buf = bytearray(remaining)
         pack_into(fint[0], buf, 0,  TYPES.M4A)
         pack_into(fint[0], buf, 4,  TYPES.VERSION2_0)
@@ -90,13 +72,12 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
 
             # after the atom type comes 5 additional fields describing the data.
             # We only care about the last two.
-            t._readInto(inStream, 20)
-            t.pos += 12  # skip time in ms, first block index, trak number
-            # total size of all blocks
-            totalBlockSize = _geetOne(fint, t.buf, t.pos)
-            t.pos += fint[1]
-            blockCount = _geetOne(fint, t.buf, t.pos)  # number of blocks
-            t.pos += fint[1]
+            # skip time in ms, first block index, trak number, overall block size, block count
+            t._readOne(fint, inStream)
+            t._readOne(fint, inStream)
+            t._readOne(fint, inStream)
+            totalBlockSize = t._readOne(fint, inStream)
+            blockCount = t._readOne(fint, inStream)  # number of blocks
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
@@ -108,7 +89,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
 
                 for _ in range(blockCount):
                     # setup
-                    sampleLength = _geetOne(fint, t.buf, t.pos)
+                    sampleLength = t._next(fint)
                     t.pos += fint[1]
                     aes = newAES(key, MODE_CBC, iv=iv)
 
