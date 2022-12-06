@@ -8,7 +8,7 @@ from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
 
 from .localExceptions import CredentialMismatch
-from .atomTypes import *
+from .atomTypes import TYPES
 
 
 fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
@@ -80,12 +80,12 @@ class Translator:
 
     def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
         length = self._readInto(inStream, remaining)
-        self._putInt(0,  M4A)
-        self._putInt(4,  VERSION2_0)
-        self._putInt(8,  ISO2)
-        self._putInt(12, M4B)
-        self._putInt(16, MP42)
-        self._putInt(20, ISOM)
+        self._putInt(0,  TYPES.M4A)
+        self._putInt(4,  TYPES.VERSION2_0)
+        self._putInt(8,  TYPES.ISO2)
+        self._putInt(12, TYPES.M4B)
+        self._putInt(16, TYPES.MP42)
+        self._putInt(20, TYPES.ISOM)
         self._zero(24, length)
         self._write(outStream)
 
@@ -107,9 +107,9 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
-            if atomType == AAVD:
+            if atomType == TYPES.AAVD:
                 # replace aavd type with mp4a type
-                t._putInt(atomTypePosition, MP4A)
+                t._putInt(atomTypePosition, TYPES.MP4A)
                 t._readInto(inStream, blockCount * 4)
                 t._write(outStream)
 
@@ -144,31 +144,31 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
 
             remaining = atomLength
 
-            if atomType == FTYP:
+            if atomType == TYPES.FTYP:
                 remaining -= t._write(outStream)
                 t.reset()
                 t._fillFtyp(inStream, remaining, outStream)
-            elif atomType == META:
+            elif atomType == TYPES.META:
                 t._readInto(inStream, 4)
                 t._write(outStream)
                 walk_atoms(atomEnd)
-            elif atomType == STSD:
+            elif atomType == TYPES.STSD:
                 t._readInto(inStream, 8)
                 t._write(outStream)
                 walk_atoms(atomEnd)
-            elif atomType == MDAT:
+            elif atomType == TYPES.MDAT:
                 t._write(outStream)
                 walk_mdat(atomEnd)
-            elif atomType == AAVD:
-                t._putInt(atomPosition, 0x6d703461)  # mp4a
+            elif atomType == TYPES.AAVD:
+                t._putInt(atomPosition, TYPES.MP4A)  # mp4a
                 remaining -= t._write(outStream)
                 _copy(inStream, remaining, outStream)
-            elif atomType == MOOV \
-                    or atomType == TRAK \
-                    or atomType == MDIA \
-                    or atomType == MINF \
-                    or atomType == STBL \
-                    or atomType == UDTA:
+            elif atomType == TYPES.MOOV \
+                    or atomType == TYPES.TRAK \
+                    or atomType == TYPES.MDIA \
+                    or atomType == TYPES.MINF \
+                    or atomType == TYPES.STBL \
+                    or atomType == TYPES.UDTA:
                 t._write(outStream)
                 walk_atoms(atomEnd)
             else:
