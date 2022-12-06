@@ -14,24 +14,23 @@ from .atomTypes import TYPES
 fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
 
 
-def _putOne(format: tuple, buffer: bytearray, position: int, value):
-    pack_into(format[0], buffer, position, value)
-
-
 def _geetOne(format: tuple, buffer, position):
     r = unpack_from(format[0], buffer, position)[0]
     return r
+
+
+def _write(inBuf, *outs: list[BufferedWriter]) -> int:
+    # fuck you python and your write function that can't sublist!
+    data = inBuf
+    for out in outs:
+        return out.write(data)
+    return
+
 
 class Translator:
     def __init__(self, size: int = None):
         self.buf = bytearray(size if size != None else 4096)
         self.pos, self.wpos = 0, 0
-
-    def _geetOne(self, format: tuple, buffer, *_):
-        length = format[1]
-        r = unpack_from(format[0], buffer, self.pos)[0]
-        self.pos = self.pos + length
-        return r
 
     def _readOne(self, format: tuple, inStream: BufferedReader):
         """convenience function to call _readInto for tuple[1] length
@@ -49,11 +48,14 @@ class Translator:
             self.wpos = self.wpos + length
         return length
 
-    def _write(self, *outs: list[BufferedWriter]) -> int:
+    def _write(self, inStream, *outs: list[BufferedWriter]) -> int:
         if self.wpos > 0:
             # fuck you python and your write function that can't sublist!
-            data = self.buf if self.wpos == len(
-                self.buf) else self.buf[0: self.wpos]
+
+            if self.wpos == len(inStream):
+                data = inStream
+            else:
+                data = inStream[0: self.wpos]
             for out in outs:
                 out.write(data)
             return self.wpos
@@ -65,15 +67,17 @@ class Translator:
 
     def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
         length = self._readInto(inStream, remaining)
-        pack_into(fint[0], self.buf, 0,  TYPES.M4A)
-        pack_into(fint[0], self.buf, 4,  TYPES.VERSION2_0)
-        pack_into(fint[0], self.buf, 8,  TYPES.ISO2)
-        pack_into(fint[0], self.buf, 12, TYPES.M4B)
-        pack_into(fint[0], self.buf, 16, TYPES.MP42)
-        pack_into(fint[0], self.buf, 20, TYPES.ISOM)
+        buf = bytearray(remaining)
+        pack_into(fint[0], buf, 0,  TYPES.M4A)
+        pack_into(fint[0], buf, 4,  TYPES.VERSION2_0)
+        pack_into(fint[0], buf, 8,  TYPES.ISO2)
+        pack_into(fint[0], buf, 12, TYPES.M4B)
+        pack_into(fint[0], buf, 16, TYPES.MP42)
+        pack_into(fint[0], buf, 20, TYPES.ISOM)
+        # pack_into(format[0], buffer, position, value)
         for i in range(24, length):
-            self.buf[i] = 0
-        self._write(outStream)
+            buf[i] = 0
+        self._write(buf, outStream)
 
 
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
@@ -98,13 +102,14 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
             # aavd has a list of sample sizes and then the samples.
             if atomType == TYPES.AAVD:
                 # replace aavd type with mp4a type
-                _putOne(fint, t.buf,  atomTypePosition, TYPES.MP4A)
+                pack_into(fint[0], t.buf,  atomTypePosition, TYPES.MP4A)
                 t._readInto(inStream, blockCount * 4)
-                t._write(outStream)
+                t._write(t.buf, outStream)
 
                 for _ in range(blockCount):
                     # setup
-                    sampleLength = t._geetOne(fint, t.buf)
+                    sampleLength = _geetOne(fint, t.buf, t.pos)
+                    t.pos += fint[1]
                     aes = newAES(key, MODE_CBC, iv=iv)
 
                     # for cipher padding, (up to) last 2 bytes are unencrypted
@@ -118,7 +123,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                     outStream.write(unencryptedData)
 
             else:
-                length = t._write(outStream)
+                length = t._write(t.buf, outStream)
                 _copy(inStream, atomLength +
                       totalBlockSize - length, outStream)
 
@@ -134,23 +139,23 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
             remaining = atomLength
 
             if atomType == TYPES.FTYP:
-                remaining -= t._write(outStream)
+                remaining -= t._write(t.buf, outStream)
                 t.pos, t.wpos = 0, 0
                 t._fillFtyp(inStream, remaining, outStream)
             elif atomType == TYPES.META:
                 t._readInto(inStream, 4)
-                t._write(outStream)
+                t._write(t.buf, outStream)
                 walk_atoms(atomEnd)
             elif atomType == TYPES.STSD:
                 t._readInto(inStream, 8)
-                t._write(outStream)
+                t._write(t.buf, outStream)
                 walk_atoms(atomEnd)
             elif atomType == TYPES.MDAT:
-                t._write(outStream)
+                t._write(t.buf, outStream)
                 walk_mdat(atomEnd)
             elif atomType == TYPES.AAVD:
-                _putOne(fint, t.buf, atomPosition, TYPES.MP4A)  # mp4a
-                remaining -= t._write(outStream)
+                pack_into(fint[0], t.buf, atomPosition, TYPES.MP4A)  # mp4a
+                remaining -= t._write(t.buf, outStream)
                 _copy(inStream, remaining, outStream)
             elif atomType == TYPES.MOOV \
                     or atomType == TYPES.TRAK \
@@ -158,10 +163,10 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
                     or atomType == TYPES.MINF \
                     or atomType == TYPES.STBL \
                     or atomType == TYPES.UDTA:
-                t._write(outStream)
+                t._write(t.buf, outStream)
                 walk_atoms(atomEnd)
             else:
-                remaining -= t._write(outStream)
+                remaining -= t._write(t.buf, outStream)
                 _copy(inStream, remaining, outStream)
 
     walk_atoms(path.getsize(inStream.name))
