@@ -55,10 +55,6 @@ class Translator:
         atomLength = self._readOne(fint, inStream)
         return atomLength if atomLength != 1 else self._readOne(flong, inStream)
 
-    def _zero(self, start: int = 0, end: int = None):
-        for i in range(start, end if end else self.wpos):
-            self.buf[i] = 0
-
     def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
         length = self._readInto(inStream, remaining)
         self._putOne(fint, 0,  TYPES.M4A)
@@ -67,7 +63,8 @@ class Translator:
         self._putOne(fint, 12, TYPES.M4B)
         self._putOne(fint, 16, TYPES.MP42)
         self._putOne(fint, 20, TYPES.ISOM)
-        self._zero(24, length)
+        for i in range(24, length):
+            self.buf[i] = 0
         self._write(outStream)
 
 
