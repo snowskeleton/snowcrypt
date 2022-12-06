@@ -23,19 +23,16 @@ class Translator:
         self.pos, self.wpos = 0, 0
 
     def _position(self) -> int: return self.pos
-    def _getShort(self) -> int: return self._getOne(fshort)
-    def _getInt(self) -> int: return self._getOne(fint)
-    def _getLong(self) -> int: return self._getOne(flong)
 
     def _getOne(self, format: tuple):
         r = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos = self.pos + format[1]
         return r
 
-    def _putOne(self, format: str | bytes, position: int, value):
+    def _putOne(self, format: str or bytes, position: int, value):
         pack_into(format[0], self.buf, position, value)
 
-    def _readOne(self, inStream: BufferedReader, format: str | bytes):
+    def _readOne(self, format: str or bytes, inStream: BufferedReader):
         length = format[1]
         self.buf[self.wpos: self.wpos + length] = inStream.read(length)
         r = unpack_from(format[0], self.buf, self.pos)[0]
@@ -58,18 +55,9 @@ class Translator:
             return self.wpos
         return 0
 
-    def _readInt(self, inStream: BufferedReader) -> int:
-        return self._readOne(inStream, fint)
-
-    def _readLong(self, inStream: BufferedReader) -> int:
-        return self._readOne(inStream, flong)
-
-    def _skipLong(self): self._skip(flong[1])
-    def _skip(self, length: int): self.pos += length
-
     def _readAtomSize(self, inStream: BufferedReader) -> int:
-        atomLength = self._readInt(inStream)
-        return atomLength if atomLength != 1 else self._readLong(inStream)
+        atomLength = self._readOne(fint, inStream)
+        return atomLength if atomLength != 1 else self._readOne(flong, inStream)
 
     def _zero(self, start: int = 0, end: int = None):
         for i in range(start, end if end else self.wpos):
@@ -92,15 +80,15 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
         while inStream.tell() < endPosition:
             t = Translator()
             atomLength = t._readAtomSize(inStream)
-            atomTypePosition = t._position()
-            atomType = t._readInt(inStream)
+            atomTypePosition = t.pos
+            atomType = t._readOne(fint, inStream)
 
             # after the atom type comes 5 additional fields describing the data.
             # We only care about the last two.
             t._readInto(inStream, 20)
             t.pos += 12  # skip time in ms, first block index, trak number
-            totalBlockSize = t._getInt()  # total size of all blocks
-            blockCount = t._getInt()  # number of blocks
+            totalBlockSize = t._getOne(fint)  # total size of all blocks
+            blockCount = t._getOne(fint)  # number of blocks
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
@@ -112,7 +100,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
 
                 for _ in range(blockCount):
                     # setup
-                    sampleLength = t._getInt()
+                    sampleLength = t._getOne(fint)
                     aes = newAES(key, MODE_CBC, iv=iv)
 
                     # for cipher padding, (up to) last 2 bytes are unencrypted
@@ -136,8 +124,8 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
             atomStart = inStream.tell()
             atomLength = t._readAtomSize(inStream)
             atomEnd = atomStart + atomLength
-            atomPosition = t._position()
-            atomType = t._readInt(inStream)
+            atomPosition = t.pos
+            atomType = t._readOne(fint, inStream)
 
             remaining = atomLength
 
