@@ -65,12 +65,12 @@ class Translator:
 
     def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
         length = self._readInto(inStream, remaining)
-        _putOne(fint, self.buf, 0,  TYPES.M4A)
-        _putOne(fint, self.buf, 4,  TYPES.VERSION2_0)
-        _putOne(fint, self.buf, 8,  TYPES.ISO2)
-        _putOne(fint, self.buf, 12, TYPES.M4B)
-        _putOne(fint, self.buf, 16, TYPES.MP42)
-        _putOne(fint, self.buf, 20, TYPES.ISOM)
+        pack_into(fint[0], self.buf, 0,  TYPES.M4A)
+        pack_into(fint[0], self.buf, 4,  TYPES.VERSION2_0)
+        pack_into(fint[0], self.buf, 8,  TYPES.ISO2)
+        pack_into(fint[0], self.buf, 12, TYPES.M4B)
+        pack_into(fint[0], self.buf, 16, TYPES.MP42)
+        pack_into(fint[0], self.buf, 20, TYPES.ISOM)
         for i in range(24, length):
             self.buf[i] = 0
         self._write(outStream)
