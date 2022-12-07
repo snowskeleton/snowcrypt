@@ -192,10 +192,9 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     Returns:
         tuple[str, str]: key, initialization vector
     """
-    fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
     _bytes = activation_bytes
-    im_key = _sha(fixedKey, bytes.fromhex(_bytes))
-    iv = _sha(fixedKey, im_key, bytes.fromhex(_bytes))  # [:16]
+    im_key = _sha(FIXEDKEY, bytes.fromhex(_bytes))
+    iv = _sha(FIXEDKEY, im_key, bytes.fromhex(_bytes))  # [:16]
     key = im_key[:16]
     # decrypt drm blob to prove we can do it
     cipher = newAES(key, MODE_CBC, iv=iv)
@@ -208,7 +207,7 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
                                  ' or the audio file is invalid or corrupt.')
     fileKey = _key_mask(data)
     fileDrm = _drm_mask(data)
-    inVect = _sha(fileDrm, fileKey, fixedKey, length=16)
+    inVect = _sha(fileDrm, fileKey, FIXEDKEY, length=16)
     return _bts(fileKey), _bts(inVect)
 
 
