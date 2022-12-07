@@ -206,17 +206,17 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     if not validDrmChecksum or not activation_bytes_match:
         raise CredentialMismatch('Either the activation bytes are incorrect'
                                  ' or the audio file is invalid or corrupt.')
-    fileKey = key_mask(data)
-    fileDrm = drm_mask(data)
+    fileKey = _key_mask(data)
+    fileDrm = _drm_mask(data)
     inVect = _sha(fileDrm, fileKey, fixedKey, length=16)
     return _bts(fileKey), _bts(inVect)
 
 
-def key_mask(data: bytes):
+def _key_mask(data: bytes):
     return data[8:24]
 
 
-def drm_mask(data: bytes):
+def _drm_mask(data: bytes):
     return data[26:42]
 
 
