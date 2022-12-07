@@ -56,7 +56,6 @@ class Translator:
         pack_into(fint[0], buf, 12, M4B)
         pack_into(fint[0], buf, 16, MP42)
         pack_into(fint[0], buf, 20, ISOM)
-        # pack_into(format[0], buffer, position, value)
         for i in range(24, length):
             buf[i] = 0
         self._write(buf, outStream)
