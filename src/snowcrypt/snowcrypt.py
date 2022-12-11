@@ -75,7 +75,7 @@ def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv
             t._readOne(fint, inStream)
             t._readOne(fint, inStream)
             totalBlockSize = t._readOne(fint, inStream)
-            blockCount = t._readOne(fint, inStream)  # number of blocks
+            blockCount = t._readOne(fint, inStream)
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
