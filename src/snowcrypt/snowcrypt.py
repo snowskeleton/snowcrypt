@@ -37,8 +37,8 @@ class Translator:
         self.wpos += length
         return length
 
-    def _write(self, inStream, out: BufferedWriter) -> int:
-        data = inStream[0: self.wpos]
+    def _write(self, out: BufferedWriter) -> int:
+        data = self.buf[0: self.wpos]
         out.write(data)
         return self.wpos
 
@@ -84,13 +84,13 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
             # replace aavd type with mp4a type
             pack_into(fint[0], t.buf,  atomTypePosition, MP4A)
             t._readInto(inStream, blockCount * 4)
-            t._write(t.buf, outStream)
+            t._write(outStream)
 
             for _ in range(blockCount):
                 outStream.write(_decrypt_aavd(inStream, key, iv, t))
 
         else:
-            length = t._write(t.buf, outStream)
+            length = t._write(outStream)
             outStream.write(inStream.read(
                 atomLength + totalBlockSize - length))
 
@@ -107,7 +107,7 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
         remaining = atomLength
 
         if atomType == FTYP:
-            remaining -= t._write(t.buf, outStream)
+            remaining -= t._write(outStream)
             buf = bytearray(remaining)
             pos = 0
             for tag in [M4A, VERSION2_0, ISO2, M4B, MP42, ISOM]:
@@ -119,18 +119,18 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             inStream.read(remaining)
         elif atomType == META:
             t._readInto(inStream, fint[1])
-            t._write(t.buf, outStream)
+            t._write(outStream)
             walk_atoms(inStream, outStream, atomEnd)
         elif atomType == STSD:
-            t._write(t.buf, outStream)
+            t._write(outStream)
             outStream.write(inStream.read(flong[1]))
             walk_atoms(inStream, outStream, atomEnd)
         elif atomType == MDAT:
-            t._write(t.buf, outStream)
+            t._write(outStream)
             walk_mdat(inStream, outStream, atomEnd, key, iv)
         elif atomType == AAVD:
             pack_into(fint[0], t.buf, atomPosition, MP4A)  # mp4a
-            remaining -= t._write(t.buf, outStream)
+            remaining -= t._write(outStream)
             outStream.write(inStream.read(remaining))
         elif atomType in (MOOV,
                           TRAK,
@@ -138,10 +138,10 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
                           MINF,
                           STBL,
                           UDTA):
-            t._write(t.buf, outStream)
+            t._write(outStream)
             walk_atoms(inStream, outStream, atomEnd)
         else:
-            remaining -= t._write(t.buf, outStream)
+            remaining -= t._write(outStream)
             outStream.write(inStream.read(remaining))
 
 
