@@ -194,7 +194,7 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     """
     _bytes = activation_bytes
     im_key = _sha(FIXEDKEY, bytes.fromhex(_bytes))
-    iv = _sha(FIXEDKEY, im_key, bytes.fromhex(_bytes))
+    iv = _sha(FIXEDKEY, im_key, bytes.fromhex(_bytes))[:16]
     key = im_key[:16]
     # decrypt drm blob to prove we can do it
     cipher = newAES(key, MODE_CBC, iv=iv)
