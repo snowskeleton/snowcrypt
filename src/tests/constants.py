@@ -125,5 +125,8 @@ shas = [
     }
 ]
 
-TEST_SAMPLE_FILE = 'aax_generated_sample.aax'
 TEST_BYTES = 'abcdef01'
+
+
+class EncryptionFailure(Exception):
+    pass
