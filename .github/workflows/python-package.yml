@@ -34,6 +34,7 @@ jobs:
       uses: peter-evans/autopep8@v1
       with:
         args: --recursive --in-place --aggressive --aggressive .
+
         
     - name: Test with pytest
       run: |
