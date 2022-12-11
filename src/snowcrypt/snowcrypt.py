@@ -6,7 +6,6 @@ from io import BufferedReader, BufferedWriter
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
-from box import Box
 
 from .localExceptions import CredentialMismatch
 from .constants import *
@@ -21,13 +20,14 @@ class Translator:
         self.pos, self.wpos = 0, 0
 
     def _next(self, format: tuple):
-        return unpack_from(format[0], self.buf, self.pos)[0]
+        data = unpack_from(format[0], self.buf, self.pos)[0]
+        self.pos += format[1]
+        return data
 
     def _readOne(self, format: tuple, inStream: BufferedReader):
         length = format[1]
         self._readInto(inStream, length)
         r = self._next(format)
-        self.pos += length
         return r
 
     def _readInto(self, inStream: BufferedReader, length: int | None) -> int:
@@ -87,13 +87,12 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
 
             for _ in range(blockCount):
                 # setup
-                sampleLength = t._next(fint)
-                t.pos += fint[1]
+                length = t._next(fint)
                 aes = newAES(key, MODE_CBC, iv=iv)
 
                 # for cipher padding, (up to) last 2 bytes are unencrypted
-                encryptedLength = sampleLength & 0xFFFFFFF0
-                unencryptedLength = sampleLength & 0x0000000F
+                encryptedLength = length & 0xFFFFFFF0
+                unencryptedLength = length & 0x0000000F
 
                 encryptedData = inStream.read(encryptedLength)
                 unencryptedData = inStream.read(unencryptedLength)
