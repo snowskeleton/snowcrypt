@@ -61,6 +61,20 @@ class Translator:
         self._write(buf, outStream)
 
 
+def _decrypt_aavd(inStream, key, iv, t):
+    # setup
+    length = t._next(fint)
+    aes = newAES(key, MODE_CBC, iv=iv)
+
+    # for cipher padding, (up to) last 2 bytes are unencrypted
+    encryptedLength = length & 0xFFFFFFF0
+    unencryptedLength = length & 0x0000000F
+
+    encryptedData = inStream.read(encryptedLength)
+    unencryptedData = inStream.read(unencryptedLength)
+
+    return aes.decrypt(encryptedData) + unencryptedData
+
 def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key, iv):
     while inStream.tell() < endPosition:
         t = Translator()
@@ -86,19 +100,7 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
             t._write(t.buf, outStream)
 
             for _ in range(blockCount):
-                # setup
-                length = t._next(fint)
-                aes = newAES(key, MODE_CBC, iv=iv)
-
-                # for cipher padding, (up to) last 2 bytes are unencrypted
-                encryptedLength = length & 0xFFFFFFF0
-                unencryptedLength = length & 0x0000000F
-
-                encryptedData = inStream.read(encryptedLength)
-                unencryptedData = inStream.read(unencryptedLength)
-
-                outStream.write(aes.decrypt(encryptedData))
-                outStream.write(unencryptedData)
+                outStream.write(_decrypt_aavd(inStream, key, iv, t))
 
         else:
             length = t._write(t.buf, outStream)
