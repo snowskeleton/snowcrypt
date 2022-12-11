@@ -4,6 +4,7 @@ from os import path
 from hashlib import sha1
 from io import BufferedReader, BufferedWriter
 from typing import List
+from collections import defaultdict
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
@@ -96,7 +97,7 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
                 atomLength + totalBlockSize - length))
 
 
-def ftyp(inStream, outStream, length, t: Translator):
+def ftyp(inStream, outStream, length, t, **_):
     length -= t._write(outStream)
     buf = bytearray(length)
     pos = 0
@@ -109,36 +110,36 @@ def ftyp(inStream, outStream, length, t: Translator):
     inStream.read(length)
 
 
-def meta(inStream, outStream, length, t):
+def meta(inStream, outStream, length, t, **_):
     t._readOne(fint, inStream)
     t._write(outStream)
     walk_atoms(inStream, outStream, length)
 
 
-def stsd(inStream, outStream, length, t):
+def stsd(inStream, outStream, length, t, **_):
     t._readOne(flong, inStream)
     t._write(outStream)
     walk_atoms(inStream, outStream, length)
 
 
-def mdat(inStream, outStream, length, t, key, iv):
+def mdat(inStream, outStream, length, t, key=None, iv=None, **_):
     t._write(outStream)
     walk_mdat(inStream, outStream, length, key, iv)
 
 
-def aavd(inStream, outStream, length, t, atomPosition):
+def aavd(inStream, outStream, length, t, atomPosition=None, **_):
     # change container name so MP4 readers don't complain
     pack_into(fint[0], t.buf, atomPosition, MP4A)
     length -= t._write(outStream)
     outStream.write(inStream.read(length))
 
 
-def bulk(inStream, outStream, length, t):
+def bulk(inStream, outStream, length, t, **_):
     t._write(outStream)
     walk_atoms(inStream, outStream, length)
 
 
-def default(inStream, outStream, length, t):
+def just_copy_it(inStream, outStream, length, t, **_):
     length -= t._write(outStream)
     outStream.write(inStream.read(length))
 
@@ -149,8 +150,12 @@ atomFuncs = {
     STSD: stsd,
     MDAT: mdat,
     AAVD: aavd,
-    'bulk': bulk,
-    'default': default,
+    MOOV: bulk,
+    TRAK: bulk,
+    MDIA: bulk,
+    MINF: bulk,
+    STBL: bulk,
+    UDTA: bulk,
 }
 
 def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key=None, iv=None):
@@ -162,22 +167,38 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
         atomPosition = t.pos
         atomType = t._readOne(fint, inStream)
 
-        if atomType == FTYP:
-            atomFuncs[FTYP](inStream, outStream, length, t)
-        elif atomType == META:
-            atomFuncs[META](inStream, outStream, length, t)
-        elif atomType == STSD:
-            atomFuncs[STSD](inStream, outStream, length, t)
-        elif atomType == MDAT:
-            # atomFuncs[MDAT](inStream, outStream, length, t, key, iv)
-            t._write(outStream)
-            walk_mdat(inStream, outStream, atomEnd, key, iv)
-        elif atomType == AAVD:
-            atomFuncs[AAVD](inStream, outStream, length, t, atomPosition)
-        elif atomType in BULK_ATOMS:
-            atomFuncs['bulk'](inStream, outStream, length, t)
+        m = False
+        # m = True
+        if m:
+            f = atomFuncs.get(atomType, just_copy_it)
+            f(
+                atomPosition=atomPosition,
+                outStream=outStream,
+                inStream=inStream,
+                atomEnd=atomEnd,
+                length=length,
+                key=key,
+                iv=iv,
+                t=t,
+            )
         else:
-            atomFuncs['default'](inStream, outStream, length, t)
+
+            if atomType == FTYP:
+                atomFuncs[FTYP](inStream, outStream, length, t)
+            elif atomType == META:
+                atomFuncs[META](inStream, outStream, length, t)
+            elif atomType == STSD:
+                atomFuncs[STSD](inStream, outStream, length, t)
+            elif atomType == MDAT:
+                atomFuncs[MDAT](inStream, outStream,
+                                atomEnd, t, key=key, iv=iv)
+            elif atomType == AAVD:
+                atomFuncs[AAVD](inStream, outStream, length,
+                                t, atomPosition=atomPosition)
+            elif atomType in BULK_ATOMS:
+                bulk(inStream, outStream, length, t)
+            else:
+                just_copy_it(inStream, outStream, length, t)
 
 
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
