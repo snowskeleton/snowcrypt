@@ -122,9 +122,9 @@ def stsd(inStream, outStream, length, t, **_):
     walk_atoms(inStream, outStream, length)
 
 
-def mdat(inStream, outStream, length, t, key=None, iv=None, **_):
+def mdat(inStream, outStream, length, t, key=None, iv=None, atomEnd=None, **_):
     t._write(outStream)
-    walk_mdat(inStream, outStream, length, key, iv)
+    walk_mdat(inStream, outStream, atomEnd, key, iv)
 
 
 def aavd(inStream, outStream, length, t, atomPosition=None, **_):
@@ -167,38 +167,17 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
         atomPosition = t.pos
         atomType = t._readOne(fint, inStream)
 
-        m = False
-        # m = True
-        if m:
-            f = atomFuncs.get(atomType, just_copy_it)
-            f(
-                atomPosition=atomPosition,
-                outStream=outStream,
-                inStream=inStream,
-                atomEnd=atomEnd,
-                length=length,
-                key=key,
-                iv=iv,
-                t=t,
-            )
-        else:
-
-            if atomType == FTYP:
-                atomFuncs[FTYP](inStream, outStream, length, t)
-            elif atomType == META:
-                atomFuncs[META](inStream, outStream, length, t)
-            elif atomType == STSD:
-                atomFuncs[STSD](inStream, outStream, length, t)
-            elif atomType == MDAT:
-                atomFuncs[MDAT](inStream, outStream,
-                                atomEnd, t, key=key, iv=iv)
-            elif atomType == AAVD:
-                atomFuncs[AAVD](inStream, outStream, length,
-                                t, atomPosition=atomPosition)
-            elif atomType in BULK_ATOMS:
-                bulk(inStream, outStream, length, t)
-            else:
-                just_copy_it(inStream, outStream, length, t)
+        func = atomFuncs.get(atomType, just_copy_it)
+        func(
+            atomPosition=atomPosition,
+            outStream=outStream,
+            inStream=inStream,
+            atomEnd=atomEnd,
+            length=length,
+            key=key,
+            iv=iv,
+            t=t,
+        )
 
 
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
