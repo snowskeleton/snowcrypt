@@ -38,7 +38,8 @@ class Translator:
         return length
 
     def _write(self, out: BufferedWriter) -> int:
-        data = self.buf[0: self.wpos]
+        end = self.wpos
+        data = self.buf[0:end]
         out.write(data)
         return self.wpos
 
@@ -120,8 +121,8 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             t._write(outStream)
             walk_atoms(inStream, outStream, atomEnd)
         elif atomType == STSD:
+            t._readOne(flong, inStream)
             t._write(outStream)
-            outStream.write(inStream.read(flong[1]))
             walk_atoms(inStream, outStream, atomEnd)
         elif atomType == MDAT:
             t._write(outStream)
