@@ -33,8 +33,7 @@ class Translator:
 
     def _readInto(self, inStream: BufferedReader, length: int or None) -> int:
         start = self.wpos
-        end = start + length
-        self.buf[start:end] = inStream.read(length)
+        self.buf[start:start + length] = inStream.read(length)
         self.wpos += length
         return length
 
@@ -46,20 +45,6 @@ class Translator:
     def _readAtomSize(self, inStream: BufferedReader) -> int:
         atomLength = self._readOne(fint, inStream)
         return atomLength if atomLength != 1 else self._readOne(flong, inStream)
-
-    def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
-        self._readInto(inStream, remaining)
-        self.wpos += remaining
-        buf = bytearray(remaining)
-        pack_into(fint[0], buf, 0,  M4A)
-        pack_into(fint[0], buf, 4,  VERSION2_0)
-        pack_into(fint[0], buf, 8,  ISO2)
-        pack_into(fint[0], buf, 12, M4B)
-        pack_into(fint[0], buf, 16, MP42)
-        pack_into(fint[0], buf, 20, ISOM)
-        for i in range(24, remaining):
-            buf[i] = 0
-        self._write(buf, outStream)
 
 
 def _decrypt_aavd(inStream, key, iv, t):
@@ -123,8 +108,15 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
 
         if atomType == FTYP:
             remaining -= t._write(t.buf, outStream)
-            t.pos, t.wpos = 0, 0
-            t._fillFtyp(inStream, remaining, outStream)
+            buf = bytearray(remaining)
+            pos = 0
+            for tag in [M4A, VERSION2_0, ISO2, M4B, MP42, ISOM]:
+                pack_into(fint[0], buf, pos, tag)
+                pos += 4
+            for i in range(24, remaining):
+                buf[i] = 0
+            outStream.write(buf)
+            inStream.read(remaining)
         elif atomType == META:
             t._readInto(inStream, fint[1])
             t._write(t.buf, outStream)
