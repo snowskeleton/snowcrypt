@@ -99,24 +99,22 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
     while inStream.tell() < endPosition:
         t = Translator()
         atomStart = inStream.tell()
-        atomLength = t._readAtomSize(inStream)
-        atomEnd = atomStart + atomLength
+        size_left = t._readAtomSize(inStream)
+        atomEnd = atomStart + size_left
         atomPosition = t.pos
         atomType = t._readOne(fint, inStream)
 
-        remaining = atomLength
-
         if atomType == FTYP:
-            remaining -= t._write(outStream)
-            buf = bytearray(remaining)
+            size_left -= t._write(outStream)
+            buf = bytearray(size_left)
             pos = 0
             for tag in [M4A, VERSION2_0, ISO2, M4B, MP42, ISOM]:
                 pack_into(fint[0], buf, pos, tag)
                 pos += 4
-            for i in range(24, remaining):
+            for i in range(24, size_left):
                 buf[i] = 0
             outStream.write(buf)
-            inStream.read(remaining)
+            inStream.read(size_left)
         elif atomType == META:
             t._readInto(inStream, fint[1])
             t._write(outStream)
@@ -129,9 +127,9 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             t._write(outStream)
             walk_mdat(inStream, outStream, atomEnd, key, iv)
         elif atomType == AAVD:
-            pack_into(fint[0], t.buf, atomPosition, MP4A)  # mp4a
-            remaining -= t._write(outStream)
-            outStream.write(inStream.read(remaining))
+            pack_into(fint[0], t.buf, atomPosition, MP4A)
+            size_left -= t._write(outStream)
+            outStream.write(inStream.read(size_left))
         elif atomType in (MOOV,
                           TRAK,
                           MDIA,
@@ -141,8 +139,8 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             t._write(outStream)
             walk_atoms(inStream, outStream, atomEnd)
         else:
-            remaining -= t._write(outStream)
-            outStream.write(inStream.read(remaining))
+            size_left -= t._write(outStream)
+            outStream.write(inStream.read(size_left))
 
 
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
