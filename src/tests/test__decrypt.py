@@ -6,7 +6,7 @@
 # from ..snowcrypt.oldcrypt import decrypt_aaxc as oldcrypt
 
 # from .constants import *
-# from ..snowcrypt.localExceptions import NotDecryptable, EncryptionFailure
+# from ..snowcrypt.localExceptions import NotDecryptable
 
 
 # def handler(*_):
