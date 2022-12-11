@@ -200,7 +200,7 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     cipher = newAES(key, MODE_CBC, iv=iv)
     data = cipher.decrypt(_getAdrmBlob(inStream))
     # check to make sure we haven't misciphered anything up till now
-    validDrmChecksum = _sha(key, iv) != _getChecksum(inStream)
+    validDrmChecksum = _sha(key, iv) == _getChecksum(inStream)
     activation_bytes_match = _swapEndien(_bts(data[:4])) == _bytes
     if not validDrmChecksum or not activation_bytes_match:
         raise CredentialMismatch('Either the activation bytes are incorrect'
