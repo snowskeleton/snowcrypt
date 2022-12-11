@@ -31,8 +31,9 @@ def create_test_file(activation_bytes: str) -> BytesIO:
         BytesIO: adrm example
     """
     file = BytesIO()
-    im_key = _sha(FIXEDKEY, bytes.fromhex(activation_bytes))
-    true_iv = _sha(FIXEDKEY, im_key, bytes.fromhex(activation_bytes))[:16]
+    bytebytes = bytes.fromhex(activation_bytes)
+    im_key = _sha(FIXEDKEY, bytebytes)
+    true_iv = _sha(FIXEDKEY, im_key, bytebytes)[:16]
     true_key = im_key[:16]
 
     # ADRM tag and length
