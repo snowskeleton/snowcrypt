@@ -130,3 +130,7 @@ TEST_BYTES = 'abcdef01'
 
 class EncryptionFailure(Exception):
     pass
+
+
+class SignificantTimeDifference(Exception):
+    pass

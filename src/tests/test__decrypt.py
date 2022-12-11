@@ -32,12 +32,18 @@
 #         try:
 #             signal.signal(signal.SIGALRM, handler)
 #             signal.alarm(5)
-#             one, two = race(contestents, 1)
+#             one, two = race(contestents, 10)
 #             if not filecmp.cmp(file1, file2):
 #                 raise EncryptionFailure('Encryption Failed')
 
 #             one = str(one)[:5]
 #             two = str(two)[:5]
+#             diff = abs(float(one) - float(two))
+#             if diff > 0.15:  # only care about 15% difference or higher
+#               msg = '\nnew : ' + one
+#               msg += '\nold : ' + two
+#               msg += '\ndif : ' + str(diff)
+#               raise SignificantTimeDifference(msg)
 #             print('new : ', one)
 #             print('old : ', two)
 #         except NotDecryptable:
