@@ -192,16 +192,21 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     Returns:
         tuple[str, str]: key, initialization vector
     """
-    _bytes = activation_bytes
-    im_key = _sha(FIXEDKEY, bytes.fromhex(_bytes))
-    iv = _sha(FIXEDKEY, im_key, bytes.fromhex(_bytes))[:16]
+    im_key = _sha(FIXEDKEY, bytes.fromhex(activation_bytes))
+    iv = _sha(FIXEDKEY, im_key, bytes.fromhex(activation_bytes), length=16)
     key = im_key[:16]
-    # decrypt drm blob to prove we can do it
+
+    inStream.seek(ADRM_START)
     cipher = newAES(key, MODE_CBC, iv=iv)
-    data = cipher.decrypt(_getAdrmBlob(inStream))
-    # check to make sure we haven't misciphered anything up till now
-    validDrmChecksum = _sha(key, iv) == _getChecksum(inStream)
-    activation_bytes_match = _swapEndian(_bts(data[:4])) == _bytes
+    data = cipher.decrypt(_pad_16(inStream.read(ADRM_LENGTH)))
+
+    inStream.seek(CKSM_START)
+    real_checksum = inStream.read(CKSM_LENGTH)
+    derived_checksum = _sha(key, iv)
+    validDrmChecksum = derived_checksum == real_checksum
+
+    real_bites = _swapEndian(_bts(data[:4]))
+    activation_bytes_match = real_bites == activation_bytes
     if not validDrmChecksum or not activation_bytes_match:
         raise CredentialMismatch('Either the activation bytes are incorrect'
                                  ' or the audio file is invalid or corrupt.')
@@ -219,16 +224,6 @@ def _drm_mask(data: bytes):
     return data[26:42]
 
 
-def _getAdrmBlob(inStream: BufferedReader):
-    inStream.seek(ADRM_START)
-    return _pad_16(inStream.read(ADRM_LENGTH))
-
-
-def _getChecksum(inStream: BufferedReader):
-    inStream.seek(CKSM_START)
-    return inStream.read(20)
-
-
 def _swapEndian(string: str):
     """turns 12345678 into 78563412
     """
@@ -243,8 +238,7 @@ def _sha(*bits: bytes, length: int = None):
     return sha1(b''.join(bits)).digest()[:length]
 
 
-def _pad_16(data: bytes) -> bytes:
-    length = 16
+def _pad_16(data: bytes, length: int = 16) -> bytes:
     length = length - (len(data) % length)
     return data + bytes([length])*length
 
