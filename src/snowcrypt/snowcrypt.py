@@ -96,48 +96,88 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
                 atomLength + totalBlockSize - length))
 
 
+def ftyp(inStream, outStream, length, t: Translator):
+    length -= t._write(outStream)
+    buf = bytearray(length)
+    pos = 0
+    for tag in FTYP_TAGS:
+        pack_into(fint[0], buf, pos, tag)
+        pos += 4
+    for i in range(24, length):
+        buf[i] = 0
+    outStream.write(buf)
+    inStream.read(length)
+
+
+def meta(inStream, outStream, length, t):
+    t._readOne(fint, inStream)
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def stsd(inStream, outStream, length, t):
+    t._readOne(flong, inStream)
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def mdat(inStream, outStream, length, t, key, iv):
+    t._write(outStream)
+    walk_mdat(inStream, outStream, length, key, iv)
+
+
+def aavd(inStream, outStream, length, t, atomPosition):
+    # change container name so MP4 readers don't complain
+    pack_into(fint[0], t.buf, atomPosition, MP4A)
+    length -= t._write(outStream)
+    outStream.write(inStream.read(length))
+
+
+def bulk(inStream, outStream, length, t):
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def default(inStream, outStream, length, t):
+    length -= t._write(outStream)
+    outStream.write(inStream.read(length))
+
+
+atomFuncs = {
+    FTYP: ftyp,
+    META: meta,
+    STSD: stsd,
+    MDAT: mdat,
+    AAVD: aavd,
+    'bulk': bulk,
+    'default': default,
+}
+
 def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key=None, iv=None):
     while inStream.tell() < endPosition:
         t = Translator()
         atomStart = inStream.tell()
-        size_left = t._readAtomSize(inStream)
-        atomEnd = atomStart + size_left
+        length = t._readAtomSize(inStream)
+        atomEnd = atomStart + length
         atomPosition = t.pos
         atomType = t._readOne(fint, inStream)
 
         if atomType == FTYP:
-            size_left -= t._write(outStream)
-            buf = bytearray(size_left)
-            pos = 0
-            for tag in FTYP_TAGS:
-                pack_into(fint[0], buf, pos, tag)
-                pos += 4
-            for i in range(24, size_left):
-                buf[i] = 0
-            outStream.write(buf)
-            inStream.read(size_left)
+            atomFuncs[FTYP](inStream, outStream, length, t)
         elif atomType == META:
-            t._readOne(fint, inStream)
-            t._write(outStream)
-            walk_atoms(inStream, outStream, atomEnd)
+            atomFuncs[META](inStream, outStream, length, t)
         elif atomType == STSD:
-            t._readOne(flong, inStream)
-            t._write(outStream)
-            walk_atoms(inStream, outStream, atomEnd)
+            atomFuncs[STSD](inStream, outStream, length, t)
         elif atomType == MDAT:
+            # atomFuncs[MDAT](inStream, outStream, length, t, key, iv)
             t._write(outStream)
             walk_mdat(inStream, outStream, atomEnd, key, iv)
         elif atomType == AAVD:
-            # change container name so MP4 readers don't complain
-            pack_into(fint[0], t.buf, atomPosition, MP4A)
-            size_left -= t._write(outStream)
-            outStream.write(inStream.read(size_left))
+            atomFuncs[AAVD](inStream, outStream, length, t, atomPosition)
         elif atomType in BULK_ATOMS:
-            t._write(outStream)
-            walk_atoms(inStream, outStream, atomEnd)
+            atomFuncs['bulk'](inStream, outStream, length, t)
         else:
-            size_left -= t._write(outStream)
-            outStream.write(inStream.read(size_left))
+            atomFuncs['default'](inStream, outStream, length, t)
 
 
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
