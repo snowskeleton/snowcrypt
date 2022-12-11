@@ -76,6 +76,7 @@ def _decrypt_aavd(inStream, key, iv, t):
 
     return aes.decrypt(encryptedData) + unencryptedData
 
+
 def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key, iv):
     while inStream.tell() < endPosition:
         t = Translator()
@@ -105,8 +106,8 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
 
         else:
             length = t._write(t.buf, outStream)
-            _copy(inStream, atomLength +
-                  totalBlockSize - length, outStream)
+            outStream.write(inStream.read(
+                atomLength + totalBlockSize - length))
 
 
 def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key=None, iv=None):
@@ -138,7 +139,7 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
         elif atomType == AAVD:
             pack_into(fint[0], t.buf, atomPosition, MP4A)  # mp4a
             remaining -= t._write(t.buf, outStream)
-            _copy(inStream, remaining, outStream)
+            outStream.write(inStream.read(remaining))
         elif atomType in (MOOV,
                           TRAK,
                           MDIA,
@@ -149,7 +150,7 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             walk_atoms(inStream, outStream, atomEnd)
         else:
             remaining -= t._write(t.buf, outStream)
-            _copy(inStream, remaining, outStream)
+            outStream.write(inStream.read(remaining))
 
 
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
@@ -247,17 +248,3 @@ def _sha(*bits: bytes, length: int = None):
 def _pad_16(data: bytes, length: int = 16) -> bytes:
     length = length - (len(data) % length)
     return data + bytes([length])*length
-
-
-def _copy(inStream: BufferedReader, length: int, *outs) -> int:
-    remaining = length
-    while remaining > 0:
-        remaining -= \
-            __write(inStream.read(min(remaining, 4096)), *outs)
-    return length
-
-
-def __write(buf, *outs: List[BufferedWriter]) -> int:
-    for out in outs:
-        out.write(buf)
-    return len(buf)
