@@ -1,4 +1,5 @@
 import time
+from typing import List
 
 
 def avg(list: list):
@@ -27,7 +28,7 @@ def run(func, args: list):
     return end - start
 
 
-def race(funcs: list[dict], laps: int):
+def race(funcs: List[dict], laps: int):
     elap1 = []
     elap2 = []
     one = funcs[0]
