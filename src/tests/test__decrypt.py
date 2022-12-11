@@ -4,7 +4,7 @@ import unittest
 from ..snowcrypt.snowcrypt import decrypt_aaxc as newcrypt
 from ..snowcrypt.oldcrypt import decrypt_aaxc as oldcrypt
 
-from .longvars import *
+from .constants import *
 from ..snowcrypt.localExceptions import NotDecryptable
 
 

@@ -6,7 +6,7 @@ import unittest
 class MyTestCases(unittest.TestCase):
   def test__snowsha(self):
     from ..snowcrypt.snowcrypt import _sha, _bts
-    from .longvars import shas
+    from .constants import shas
     for sha in shas:
       h = sha['asci'].encode('utf-8')
       mix = _sha(h)
