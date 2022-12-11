@@ -221,7 +221,7 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     fixedKey = bytes.fromhex('77214d4b196a87cd520045fd20a51d67')
     _bytes = activation_bytes
     im_key = _snowsha(fixedKey, bytes.fromhex(_bytes))
-    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))  # [:16]
+    iv = _snowsha(fixedKey, im_key, bytes.fromhex(_bytes))[:16]
     key = im_key[:16]
     # decrypt drm blob to prove we can do it
     cipher = newAES(key, MODE_CBC, iv=iv)
