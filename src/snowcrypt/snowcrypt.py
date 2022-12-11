@@ -243,7 +243,8 @@ def _sha(*bits: bytes, length: int = None):
     return sha1(b''.join(bits)).digest()[:length]
 
 
-def _pad_16(data: bytes, length: int) -> bytes:
+def _pad_16(data: bytes) -> bytes:
+    length = 16
     length = length - (len(data) % length)
     return data + bytes([length])*length
 
