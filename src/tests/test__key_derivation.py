@@ -1,9 +1,10 @@
 import unittest
-from Crypto.Cipher.AES import MODE_CBC, new as newAES
-from ..snowcrypt.snowcrypt import deriveKeyIV, _sha, _swapEndian, _pad_16
-from ..snowcrypt.constants import FIXEDKEY, ADRM_START, ADRM_LENGTH
-from .constants import TEST_BYTES
 from io import BytesIO
+from Crypto.Cipher.AES import MODE_CBC, new as newAES
+from ..snowcrypt.constants import FIXEDKEY, ADRM_START, ADRM_LENGTH
+from ..snowcrypt.localExceptions import CredentialMismatch
+from ..snowcrypt.snowcrypt import deriveKeyIV, _sha, _swapEndian, _pad_16
+from .constants import TEST_BYTES
 
 
 class MyTestCases(unittest.TestCase):
@@ -13,7 +14,6 @@ class MyTestCases(unittest.TestCase):
         file.close()
 
     def test__key_derivation_with_bad_key(self):
-        from ..snowcrypt.localExceptions import CredentialMismatch
         garbage = 'abc123ff'  # random hex string, different than TEST_BYTES
         file = create_test_file(garbage)
         self.assertRaises(CredentialMismatch, deriveKeyIV, file, TEST_BYTES)
