@@ -48,7 +48,7 @@ class Translator:
         return atomLength if atomLength != 1 else self._readOne(flong, inStream)
 
 
-def _decrypt_aavd(inStream, key, iv, t):
+def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     # setup
     length = t._next(fint)
     aes = newAES(key, MODE_CBC, iv=iv)
