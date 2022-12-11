@@ -130,12 +130,7 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             pack_into(fint[0], t.buf, atomPosition, MP4A)
             size_left -= t._write(outStream)
             outStream.write(inStream.read(size_left))
-        elif atomType in (MOOV,
-                          TRAK,
-                          MDIA,
-                          MINF,
-                          STBL,
-                          UDTA):
+        elif atomType in BULK_ATOMS:
             t._write(outStream)
             walk_atoms(inStream, outStream, atomEnd)
         else:
