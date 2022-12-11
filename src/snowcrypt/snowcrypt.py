@@ -109,7 +109,7 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             size_left -= t._write(outStream)
             buf = bytearray(size_left)
             pos = 0
-            for tag in [M4A, VERSION2_0, ISO2, M4B, MP42, ISOM]:
+            for tag in FTYP_TAGS:
                 pack_into(fint[0], buf, pos, tag)
                 pos += 4
             for i in range(24, size_left):
