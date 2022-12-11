@@ -3,6 +3,7 @@ from struct import unpack_from, pack_into
 from os import path
 from hashlib import sha1
 from io import BufferedReader, BufferedWriter
+from typing import List
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
@@ -30,7 +31,7 @@ class Translator:
         r = self._next(format)
         return r
 
-    def _readInto(self, inStream: BufferedReader, length: int | None) -> int:
+    def _readInto(self, inStream: BufferedReader, length: int or None) -> int:
         start = self.wpos
         end = start + length
         self.buf[start:end] = inStream.read(length)
@@ -256,7 +257,7 @@ def _copy(inStream: BufferedReader, length: int, *outs) -> int:
     return length
 
 
-def __write(buf, *outs: list[BufferedWriter]) -> int:
+def __write(buf, *outs: List[BufferedWriter]) -> int:
     for out in outs:
         out.write(buf)
     return len(buf)
