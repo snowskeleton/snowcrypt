@@ -201,7 +201,7 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     data = cipher.decrypt(_getAdrmBlob(inStream))
     # check to make sure we haven't misciphered anything up till now
     validDrmChecksum = _sha(key, iv) == _getChecksum(inStream)
-    activation_bytes_match = _swapEndien(_bts(data[:4])) == _bytes
+    activation_bytes_match = _swapEndian(_bts(data[:4])) == _bytes
     if not validDrmChecksum or not activation_bytes_match:
         raise CredentialMismatch('Either the activation bytes are incorrect'
                                  ' or the audio file is invalid or corrupt.')
@@ -229,7 +229,7 @@ def _getChecksum(inStream: BufferedReader):
     return inStream.read(20)
 
 
-def _swapEndien(string: str):
+def _swapEndian(string: str):
     """turns 12345678 into 78563412
     """
     return "".join(map(str.__add__, string[-2::-2], string[-1::-2]))

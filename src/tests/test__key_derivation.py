@@ -1,7 +1,6 @@
 import unittest
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
-from hashlib import sha1
-from ..snowcrypt.snowcrypt import deriveKeyIV, _sha
+from ..snowcrypt.snowcrypt import deriveKeyIV, _sha, _swapEndian, _pad_16
 from ..snowcrypt.constants import *
 from .constants import *
 
@@ -26,7 +25,8 @@ def create_test_file(filename):
         inStream.write(bytes.fromhex(tag))
 
         cipher = newAES(key, MODE_CBC, iv=iv)
-        adrm = bytes.fromhex(_swapEndian('f' * ADRM_LENGTH + TEST_BYTES))
+        adrm = 'f' * ADRM_LENGTH + TEST_BYTES
+        adrm = bytes.fromhex(_swapEndian(adrm))
         inStream.write(bytes.fromhex('01') + cipher.encrypt(_pad_16(adrm)))
 
         # checksum
@@ -34,20 +34,5 @@ def create_test_file(filename):
         inStream.write(_sha(key, iv))
 
 
-def _pad_16(data: bytes, length: int = 16) -> bytes:
-    length = length - (len(data) % length)
-    return data + bytes([length])*length
-
-
 if __name__ == '__main__':
     unittest.main()
-
-
-def _sha(*bits: bytes, length: int = None):
-    return sha1(b''.join(bits)).digest()[:length]
-
-
-def _swapEndian(string: str):
-    """turns 12345678 into 78563412
-    """
-    return "".join(string[i] + string[i + 1] for i in range(-2, -len(string) - 1, -2))
