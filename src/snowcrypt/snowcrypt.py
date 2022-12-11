@@ -6,6 +6,7 @@ from io import BufferedReader, BufferedWriter
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
+from box import Box
 
 from .localExceptions import CredentialMismatch
 from .constants import *
@@ -60,95 +61,97 @@ class Translator:
         self._write(buf, outStream)
 
 
+def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key, iv):
+    while inStream.tell() < endPosition:
+        t = Translator()
+        atomLength = t._readAtomSize(inStream)
+        atomTypePosition = t.pos
+        atomType = t._readOne(fint, inStream)
+
+        # after the atom type comes 5 additional fields describing the data.
+        # We only care about the last two.
+        # skip time in ms, first block index, trak number, overall block size, block count
+        t._readOne(fint, inStream)
+        t._readOne(fint, inStream)
+        t._readOne(fint, inStream)
+        totalBlockSize = t._readOne(fint, inStream)
+        blockCount = t._readOne(fint, inStream)
+
+        # next come the atom specific fields
+        # aavd has a list of sample sizes and then the samples.
+        if atomType == AAVD:
+            # replace aavd type with mp4a type
+            pack_into(fint[0], t.buf,  atomTypePosition, MP4A)
+            t._readInto(inStream, blockCount * 4)
+            t._write(t.buf, outStream)
+
+            for _ in range(blockCount):
+                # setup
+                sampleLength = t._next(fint)
+                t.pos += fint[1]
+                aes = newAES(key, MODE_CBC, iv=iv)
+
+                # for cipher padding, (up to) last 2 bytes are unencrypted
+                encryptedLength = sampleLength & 0xFFFFFFF0
+                unencryptedLength = sampleLength & 0x0000000F
+
+                encryptedData = inStream.read(encryptedLength)
+                unencryptedData = inStream.read(unencryptedLength)
+
+                outStream.write(aes.decrypt(encryptedData))
+                outStream.write(unencryptedData)
+
+        else:
+            length = t._write(t.buf, outStream)
+            _copy(inStream, atomLength +
+                  totalBlockSize - length, outStream)
+
+
+def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key=None, iv=None):
+    while inStream.tell() < endPosition:
+        t = Translator()
+        atomStart = inStream.tell()
+        atomLength = t._readAtomSize(inStream)
+        atomEnd = atomStart + atomLength
+        atomPosition = t.pos
+        atomType = t._readOne(fint, inStream)
+
+        remaining = atomLength
+
+        if atomType == FTYP:
+            remaining -= t._write(t.buf, outStream)
+            t.pos, t.wpos = 0, 0
+            t._fillFtyp(inStream, remaining, outStream)
+        elif atomType == META:
+            t._readInto(inStream, 4)
+            t._write(t.buf, outStream)
+            walk_atoms(inStream, outStream, atomEnd)
+        elif atomType == STSD:
+            t._readInto(inStream, 8)
+            t._write(t.buf, outStream)
+            walk_atoms(inStream, outStream, atomEnd)
+        elif atomType == MDAT:
+            t._write(t.buf, outStream)
+            walk_mdat(inStream, outStream, atomEnd, key, iv)
+        elif atomType == AAVD:
+            pack_into(fint[0], t.buf, atomPosition, MP4A)  # mp4a
+            remaining -= t._write(t.buf, outStream)
+            _copy(inStream, remaining, outStream)
+        elif atomType in (MOOV,
+                          TRAK,
+                          MDIA,
+                          MINF,
+                          STBL,
+                          UDTA):
+            t._write(t.buf, outStream)
+            walk_atoms(inStream, outStream, atomEnd)
+        else:
+            remaining -= t._write(t.buf, outStream)
+            _copy(inStream, remaining, outStream)
+
+
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
-    def walk_mdat(endPosition: int):  # samples
-        while inStream.tell() < endPosition:
-            t = Translator()
-            atomLength = t._readAtomSize(inStream)
-            atomTypePosition = t.pos
-            atomType = t._readOne(fint, inStream)
-
-            # after the atom type comes 5 additional fields describing the data.
-            # We only care about the last two.
-            # skip time in ms, first block index, trak number, overall block size, block count
-            t._readOne(fint, inStream)
-            t._readOne(fint, inStream)
-            t._readOne(fint, inStream)
-            totalBlockSize = t._readOne(fint, inStream)
-            blockCount = t._readOne(fint, inStream)
-
-            # next come the atom specific fields
-            # aavd has a list of sample sizes and then the samples.
-            if atomType == AAVD:
-                # replace aavd type with mp4a type
-                pack_into(fint[0], t.buf,  atomTypePosition, MP4A)
-                t._readInto(inStream, blockCount * 4)
-                t._write(t.buf, outStream)
-
-                for _ in range(blockCount):
-                    # setup
-                    sampleLength = t._next(fint)
-                    t.pos += fint[1]
-                    aes = newAES(key, MODE_CBC, iv=iv)
-
-                    # for cipher padding, (up to) last 2 bytes are unencrypted
-                    encryptedLength = sampleLength & 0xFFFFFFF0
-                    unencryptedLength = sampleLength & 0x0000000F
-
-                    encryptedData = inStream.read(encryptedLength)
-                    unencryptedData = inStream.read(unencryptedLength)
-
-                    outStream.write(aes.decrypt(encryptedData))
-                    outStream.write(unencryptedData)
-
-            else:
-                length = t._write(t.buf, outStream)
-                _copy(inStream, atomLength +
-                      totalBlockSize - length, outStream)
-
-    def walk_atoms(endPosition: int):  # everything
-        while inStream.tell() < endPosition:
-            t = Translator()
-            atomStart = inStream.tell()
-            atomLength = t._readAtomSize(inStream)
-            atomEnd = atomStart + atomLength
-            atomPosition = t.pos
-            atomType = t._readOne(fint, inStream)
-
-            remaining = atomLength
-
-            if atomType == FTYP:
-                remaining -= t._write(t.buf, outStream)
-                t.pos, t.wpos = 0, 0
-                t._fillFtyp(inStream, remaining, outStream)
-            elif atomType == META:
-                t._readInto(inStream, 4)
-                t._write(t.buf, outStream)
-                walk_atoms(atomEnd)
-            elif atomType == STSD:
-                t._readInto(inStream, 8)
-                t._write(t.buf, outStream)
-                walk_atoms(atomEnd)
-            elif atomType == MDAT:
-                t._write(t.buf, outStream)
-                walk_mdat(atomEnd)
-            elif atomType == AAVD:
-                pack_into(fint[0], t.buf, atomPosition, MP4A)  # mp4a
-                remaining -= t._write(t.buf, outStream)
-                _copy(inStream, remaining, outStream)
-            elif atomType in (MOOV,
-                              TRAK,
-                              MDIA,
-                              MINF,
-                              STBL,
-                              UDTA):
-                t._write(t.buf, outStream)
-                walk_atoms(atomEnd)
-            else:
-                remaining -= t._write(t.buf, outStream)
-                _copy(inStream, remaining, outStream)
-
-    walk_atoms(path.getsize(inStream.name))
+    walk_atoms(inStream, outStream, path.getsize(inStream.name), key, iv)
 
 
 def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
@@ -191,6 +194,7 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     Returns:
         tuple[str, str]: key, initialization vector
     """
+    file_start = inStream.tell()
     im_key = _sha(FIXEDKEY, bytes.fromhex(activation_bytes))
     iv = _sha(FIXEDKEY, im_key, bytes.fromhex(activation_bytes), length=16)
     key = im_key[:16]
@@ -212,6 +216,7 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     fileKey = _key_mask(data)
     fileDrm = _drm_mask(data)
     inVect = _sha(fileDrm, fileKey, FIXEDKEY, length=16)
+    inStream.seek(file_start)
     return _bts(fileKey), _bts(inVect)
 
 
