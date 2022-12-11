@@ -46,9 +46,8 @@ class Translator:
         return atomLength if atomLength != 1 else self._readOne(flong, inStream)
 
     def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
-        length = remaining
         self._readInto(inStream, remaining)
-        self.wpos += length
+        self.wpos += remaining
         buf = bytearray(remaining)
         pack_into(fint[0], buf, 0,  M4A)
         pack_into(fint[0], buf, 4,  VERSION2_0)
@@ -56,7 +55,7 @@ class Translator:
         pack_into(fint[0], buf, 12, M4B)
         pack_into(fint[0], buf, 16, MP42)
         pack_into(fint[0], buf, 20, ISOM)
-        for i in range(24, length):
+        for i in range(24, remaining):
             buf[i] = 0
         self._write(buf, outStream)
 
