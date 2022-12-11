@@ -47,5 +47,8 @@ class MyTestCases(unittest.TestCase):
         #     signal.alarm(0)          # Disable the alarm
 
 
+def main():
+    MyTestCases().test__same_as_legacy()
+
 if __name__ == "__main__":
     unittest.main()
