@@ -1,8 +1,8 @@
 import unittest
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from ..snowcrypt.snowcrypt import deriveKeyIV, _sha, _swapEndian, _pad_16
-from ..snowcrypt.constants import *
-from .constants import *
+from ..snowcrypt.constants import FIXEDKEY, ADRM_START, ADRM_LENGTH
+from .constants import TEST_BYTES, TEST_SAMPLE_FILE
 
 
 class MyTestCases(unittest.TestCase):
