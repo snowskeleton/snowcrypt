@@ -126,12 +126,12 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             t.pos, t.wpos = 0, 0
             t._fillFtyp(inStream, remaining, outStream)
         elif atomType == META:
-            t._readInto(inStream, 4)
+            t._readInto(inStream, fint[1])
             t._write(t.buf, outStream)
             walk_atoms(inStream, outStream, atomEnd)
         elif atomType == STSD:
-            t._readInto(inStream, 8)
             t._write(t.buf, outStream)
+            outStream.write(inStream.read(flong[1]))
             walk_atoms(inStream, outStream, atomEnd)
         elif atomType == MDAT:
             t._write(t.buf, outStream)
