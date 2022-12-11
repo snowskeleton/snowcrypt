@@ -1,4 +1,4 @@
-#this can only run if you have audio files downloaded from mkb79/audible-cli
+# this can only run if you have audio files downloaded from mkb79/audible-cli
 # import filecmp
 # import signal
 # import unittest
@@ -30,26 +30,27 @@
 # class MyTestCases(unittest.TestCase):
 #     def test__same_as_legacy(self):
 #         try:
-#             # signal.signal(signal.SIGALRM, handler)
-#             # signal.alarm(5)
+#             signal.signal(signal.SIGALRM, handler)
+#             signal.alarm(5)
 #             one, two = race(contestents, 1)
-#             self.assertTrue(filecmp.cmp(file1, file2))
+#             if not filecmp.cmp(file1, file2):
+#                 raise EncryptionFailure('Encryption Failed')
+
 #             one = str(one)[:5]
 #             two = str(two)[:5]
 #             print('new : ', one)
 #             print('old : ', two)
-#         except AssertionError:
-#             print('Files are not the same')
 #         except NotDecryptable:
 #             print('Decryption took too long')
 #         except KeyboardInterrupt:
 #             print('\nReceived escape sequence')
-#         # finally:
-#         #     signal.alarm(0)          # Disable the alarm
+#         finally:
+#             signal.alarm(0)          # Disable the alarm
 
 
 # def main():
 #     MyTestCases().test__same_as_legacy()
+
 
 # if __name__ == "__main__":
 #     unittest.main()
