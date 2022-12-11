@@ -116,7 +116,7 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             outStream.write(buf)
             inStream.read(size_left)
         elif atomType == META:
-            t._readInto(inStream, fint[1])
+            t._readOne(fint, inStream)
             t._write(outStream)
             walk_atoms(inStream, outStream, atomEnd)
         elif atomType == STSD:
@@ -127,6 +127,7 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
             t._write(outStream)
             walk_mdat(inStream, outStream, atomEnd, key, iv)
         elif atomType == AAVD:
+            # change container name so MP4 readers don't complain
             pack_into(fint[0], t.buf, atomPosition, MP4A)
             size_left -= t._write(outStream)
             outStream.write(inStream.read(size_left))
