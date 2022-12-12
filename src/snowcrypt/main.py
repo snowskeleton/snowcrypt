@@ -13,15 +13,20 @@ def signal_handler(sig, frame):
 
 
 def main():
-    infile = arg('input')
+    infile: str = arg('input')
     tags = MP4.get(infile, encoding='MP4')
     title = tags.title.replace(' (Unabridged)', '')
     outfile = title + '.m4a'
 
+    # determine key and initialization vector
     if infile.endswith('.aax'):
-        _bytes = arg('bytes')
+        activation_bytes = arg('bytes')
+        if not activation_bytes:
+            raise NotDecryptable(
+                'Must supply activation_bytes to decrypt .aax format.')
+
         with open(infile, 'rb') as f:
-            key, iv = deriveKeyIV(f, _bytes)
+            key, iv = deriveKeyIV(f, activation_bytes)
 
     elif infile.endswith('.aaxc'):
         voucher = infile.replace('.aaxc', '.voucher')
