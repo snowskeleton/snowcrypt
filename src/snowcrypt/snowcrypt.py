@@ -234,9 +234,10 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     iv = _sha(FIXEDKEY, im_key, bytes.fromhex(activation_bytes), length=16)
     key = im_key[:16]
 
-    inStream.seek(ADRM_START)
     cipher = newAES(key, MODE_CBC, iv=iv)
-    data = cipher.decrypt(_pad_16(inStream.read(ADRM_LENGTH)))
+    inStream.seek(ADRM_START)
+    data = _pad_16(inStream.read(ADRM_LENGTH))
+    data = cipher.decrypt(data)
 
     inStream.seek(CKSM_START)
     real_checksum = inStream.read(CKSM_LENGTH)
@@ -248,10 +249,12 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     if not validDrmChecksum or not activation_bytes_match:
         raise CredentialMismatch('Either the activation bytes are incorrect'
                                  ' or the audio file is invalid or corrupt.')
+
     fileKey = _key_mask(data)
     fileDrm = _drm_mask(data)
     inVect = _sha(fileDrm, fileKey, FIXEDKEY, length=16)
     inStream.seek(file_start)
+
     return _bts(fileKey), _bts(inVect)
 
 
