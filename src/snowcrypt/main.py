@@ -14,10 +14,6 @@ def signal_handler(sig, frame):
 
 def main():
     infile: str = arg('input')
-    tags = MP4.get(infile, encoding='MP4')
-    title = tags.title.replace(' (Unabridged)', '')
-    outfile = title + '.m4a'
-
     # determine key and initialization vector
     if infile.endswith('.aax'):
         activation_bytes = arg('bytes')
@@ -44,6 +40,10 @@ def main():
             str(infile) +
             "The file you provided doesn't end with '.aax' or '.aaxc'. " +
             "Please supply one that does.")
+
+    tags = MP4.get(infile, encoding='MP4')
+    title = tags.title.replace(' (Unabridged)', '')
+    outfile = title + '.m4a'
 
     decrypt_aaxc(
         infile,
