@@ -4,7 +4,7 @@ from os import path
 
 from .snowcrypt import decrypt_aaxc, deriveKeyIV
 from .localExceptions import NotDecryptable
-from .parser import arg
+from .myparser import arg
 from .tinytag import MP4
 
 

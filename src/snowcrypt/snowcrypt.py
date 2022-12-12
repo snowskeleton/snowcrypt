@@ -3,8 +3,6 @@ from struct import unpack_from, pack_into
 from os import path
 from hashlib import sha1
 from io import BufferedReader, BufferedWriter
-from typing import List
-from collections import defaultdict
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
