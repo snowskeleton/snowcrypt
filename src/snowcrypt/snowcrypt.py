@@ -47,6 +47,21 @@ class Translator:
         return self.wpos
 
 
+def _encrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
+    # setup
+    length = t.next(fint)
+    aes = newAES(key, MODE_CBC, iv=iv)
+
+    # for cipher padding, (up to) last 2 bytes are unencrypted
+    encryptedLength = length & 0xFFFFFFF0
+    unencryptedLength = length & 0x0000000F
+
+    encryptedData = inStream.read(encryptedLength)
+    unencryptedData = inStream.read(unencryptedLength)
+
+    return aes.encrypt(encryptedData) + unencryptedData
+
+
 def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     # setup
     length = t.next(fint)
@@ -62,26 +77,26 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     return aes.decrypt(encryptedData) + unencryptedData
 
 
-def _meta_mask(inStream, outStream, length, t, **_):
+def _meta_atom_handler(inStream, outStream, length, t, **_):
     t.readOne(fint, inStream)
     t.write(outStream)
     _atomizer(inStream, outStream, length)
 
 
-def _stsd_mask(inStream, outStream, length, t, **_):
+def _stsd_atom_handler(inStream, outStream, length, t, **_):
     t.readOne(flong, inStream)
     t.write(outStream)
     _atomizer(inStream, outStream, length)
 
 
-def _aavd_mask(inStream, outStream, length, t, atomPosition=None, **_):
+def _aavd_atom_handler(inStream, outStream, length, t, atomPosition=None, **_):
     # change container name so MP4 readers don't complain
     pack_into(fint[0], t.buf, atomPosition, MP4A)
     length -= t.write(outStream)
     outStream.write(inStream.read(length))
 
 
-def _default_mask(inStream, outStream, length, t, **_):
+def _default_atom_handler(inStream, outStream, length, t, **_):
     t.write(outStream)
     _atomizer(inStream, outStream, length)
 
@@ -104,7 +119,7 @@ def _ftyp_writer(inStream, outStream, length, t, **_):
     inStream.read(length)
 
 
-def _mdat_writer(inStream, outStream, length, t, key=None, iv=None, atomEnd=None, **_):
+def _mdat_decrypter(inStream, outStream, length, t, key=None, iv=None, atomEnd=None, **_):
     # this is the main work horse
     t.write(outStream)
     while inStream.tell() < atomEnd:
@@ -142,16 +157,16 @@ def _mdat_writer(inStream, outStream, length, t, key=None, iv=None, atomEnd=None
 
 _atomFuncs = {
     FTYP: _ftyp_writer,
-    MDAT: _mdat_writer,
-    AAVD: _aavd_mask,
-    META: _meta_mask,
-    STSD: _stsd_mask,
-    MOOV: _default_mask,
-    TRAK: _default_mask,
-    MDIA: _default_mask,
-    MINF: _default_mask,
-    STBL: _default_mask,
-    UDTA: _default_mask,
+    MDAT: _mdat_decrypter,
+    AAVD: _aavd_atom_handler,
+    META: _meta_atom_handler,
+    STSD: _stsd_atom_handler,
+    MOOV: _default_atom_handler,
+    TRAK: _default_atom_handler,
+    MDIA: _default_atom_handler,
+    MINF: _default_atom_handler,
+    STBL: _default_atom_handler,
+    UDTA: _default_atom_handler,
 }
 
 
