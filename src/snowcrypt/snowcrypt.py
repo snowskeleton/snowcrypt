@@ -21,15 +21,15 @@ class Translator:
         self.buf = bytearray(size if size != None else 4096)
         self.pos, self.wpos = 0, 0
 
-    def _next(self, format: tuple):
+    def next(self, format: tuple):
         data = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos += format[1]
         return data
 
-    def _readOne(self, format: tuple, inStream: BufferedReader):
+    def readOne(self, format: tuple, inStream: BufferedReader):
         length = format[1]
         self._readInto(inStream, length)
-        r = self._next(format)
+        r = self.next(format)
         return r
 
     def _readInto(self, inStream: BufferedReader, length: int or None) -> int:
@@ -38,20 +38,20 @@ class Translator:
         self.wpos += length
         return length
 
-    def _write(self, out: BufferedWriter) -> int:
+    def write(self, out: BufferedWriter) -> int:
         end = self.wpos
         data = self.buf[0:end]
         out.write(data)
         return self.wpos
 
-    def _readAtomSize(self, inStream: BufferedReader) -> int:
-        atomLength = self._readOne(fint, inStream)
-        return atomLength if atomLength != 1 else self._readOne(flong, inStream)
+    def readAtomSize(self, inStream: BufferedReader) -> int:
+        atomLength = self.readOne(fint, inStream)
+        return atomLength if atomLength != 1 else self.readOne(flong, inStream)
 
 
 def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     # setup
-    length = t._next(fint)
+    length = t.next(fint)
     aes = newAES(key, MODE_CBC, iv=iv)
 
     # for cipher padding, (up to) last 2 bytes are unencrypted
@@ -67,13 +67,13 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
 def _meta_mask(inStream, outStream, length, t, **_):
     t._readOne(fint, inStream)
     t._write(outStream)
-    walk_atoms(inStream, outStream, length)
+    _atomizer(inStream, outStream, length)
 
 
 def _stsd_mask(inStream, outStream, length, t, **_):
     t._readOne(flong, inStream)
     t._write(outStream)
-    walk_atoms(inStream, outStream, length)
+    _atomizer(inStream, outStream, length)
 
 
 def _aavd_mask(inStream, outStream, length, t, atomPosition=None, **_):
@@ -85,7 +85,7 @@ def _aavd_mask(inStream, outStream, length, t, atomPosition=None, **_):
 
 def _default_mask(inStream, outStream, length, t, **_):
     t._write(outStream)
-    walk_atoms(inStream, outStream, length)
+    _atomizer(inStream, outStream, length)
 
 
 def _just_copy_it(inStream, outStream, length, t, **_):
@@ -111,19 +111,19 @@ def _mdat_writer(inStream, outStream, length, t, key=None, iv=None, atomEnd=None
     t._write(outStream)
     while inStream.tell() < atomEnd:
         t = Translator()
-        atomLength = t._readAtomSize(inStream)
+        atomLength = t.readAtomSize(inStream)
         atomTypePosition = t.pos
-        atomType = t._readOne(fint, inStream)
+        atomType = t.readOne(fint, inStream)
 
         # after the atom type comes 5 additional fields describing the data.
         # We only care about the last two.
         # skip (in order) time (in ms), first block index,
         # trak number, overall block size, block count
-        t._readOne(fint, inStream)
-        t._readOne(fint, inStream)
-        t._readOne(fint, inStream)
-        totalBlockSize = t._readOne(fint, inStream)
-        blockCount = t._readOne(fint, inStream)
+        t.readOne(fint, inStream)
+        t.readOne(fint, inStream)
+        t.readOne(fint, inStream)
+        totalBlockSize = t.readOne(fint, inStream)
+        blockCount = t.readOne(fint, inStream)
 
         # next come the atom specific fields
         # aavd has a list of sample sizes and then the samples.
@@ -131,18 +131,18 @@ def _mdat_writer(inStream, outStream, length, t, key=None, iv=None, atomEnd=None
             # replace aavd type with mp4a type
             pack_into(fint[0], t.buf,  atomTypePosition, MP4A)
             t._readInto(inStream, blockCount * 4)
-            t._write(outStream)
+            t.write(outStream)
 
             for _ in range(blockCount):
                 outStream.write(_decrypt_aavd(inStream, key, iv, t))
 
         else:
-            length = t._write(outStream)
+            length = t.write(outStream)
             outStream.write(inStream.read(
                 atomLength + totalBlockSize - length))
 
 
-atomFuncs = {
+_atomFuncs = {
     FTYP: _ftyp_writer,
     MDAT: _mdat_writer,
     AAVD: _aavd_mask,
@@ -157,7 +157,7 @@ atomFuncs = {
 }
 
 
-def walk_atoms(
+def _atomizer(
     inStream: BufferedReader = None,
     outStream: BufferedWriter = None,
     eof: int = None,
@@ -167,12 +167,12 @@ def walk_atoms(
     while inStream.tell() < eof:
         t = Translator()
         atomStart = inStream.tell()
-        length = t._readAtomSize(inStream)
+        length = t.readAtomSize(inStream)
         atomEnd = atomStart + length
         atomPosition = t.pos
-        atomType = t._readOne(fint, inStream)
+        atomType = t.readOne(fint, inStream)
 
-        func = atomFuncs.get(atomType, _just_copy_it)
+        func = _atomFuncs.get(atomType, _just_copy_it)
         func(
             atomPosition=atomPosition,
             outStream=outStream,
@@ -186,7 +186,7 @@ def walk_atoms(
 
 
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
-    walk_atoms(inStream, outStream, path.getsize(inStream.name), key, iv)
+    _atomizer(inStream, outStream, path.getsize(inStream.name), key, iv)
 
 
 def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
