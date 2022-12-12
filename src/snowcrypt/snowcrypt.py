@@ -19,10 +19,20 @@ class Translator:
         self.buf = bytearray(size if size != None else 4096)
         self.pos, self.wpos = 0, 0
 
+    def _readInto(self, inStream: BufferedReader, length: int or None) -> int:
+        start = self.wpos
+        self.buf[start:start + length] = inStream.read(length)
+        self.wpos += length
+        return length
+
     def next(self, format: tuple):
         data = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos += format[1]
         return data
+
+    def readAtomSize(self, inStream: BufferedReader) -> int:
+        atomLength = self.readOne(fint, inStream)
+        return atomLength if atomLength != 1 else self.readOne(flong, inStream)
 
     def readOne(self, format: tuple, inStream: BufferedReader):
         length = format[1]
@@ -30,21 +40,11 @@ class Translator:
         r = self.next(format)
         return r
 
-    def _readInto(self, inStream: BufferedReader, length: int or None) -> int:
-        start = self.wpos
-        self.buf[start:start + length] = inStream.read(length)
-        self.wpos += length
-        return length
-
     def write(self, out: BufferedWriter) -> int:
         end = self.wpos
         data = self.buf[0:end]
         out.write(data)
         return self.wpos
-
-    def readAtomSize(self, inStream: BufferedReader) -> int:
-        atomLength = self.readOne(fint, inStream)
-        return atomLength if atomLength != 1 else self.readOne(flong, inStream)
 
 
 def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
@@ -183,10 +183,6 @@ def _atomizer(
         )
 
 
-def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
-    _atomizer(inStream, outStream, path.getsize(inStream.name), key, iv)
-
-
 def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
     """converts inpath with key and iv, writing to outpath
 
@@ -200,7 +196,13 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
     iv = bytes.fromhex(iv)
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
-            _decrypt(src, dest, key, iv)
+            _atomizer(
+                inStream=src,
+                outStream=dest,
+                eof=path.getsize(src.name),
+                key=key,
+                iv=iv,
+            )
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
