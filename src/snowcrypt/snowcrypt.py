@@ -119,7 +119,17 @@ def _ftyp_writer(inStream, outStream, length, t, **_):
     inStream.read(length)
 
 
-def _mdat_decrypter(inStream, outStream, length, t, key=None, iv=None, atomEnd=None, **_):
+def _mdat_handler(
+        inStream,
+        outStream,
+        length,
+        t,
+        encrypt=False,
+        atomEnd=None,
+        key=None,
+        iv=None,
+        ** _,
+):
     # this is the main work horse
     t.write(outStream)
     while inStream.tell() < atomEnd:
@@ -140,14 +150,17 @@ def _mdat_decrypter(inStream, outStream, length, t, key=None, iv=None, atomEnd=N
 
         # next come the atom specific fields
         # aavd has a list of sample sizes and then the samples.
-        if atomType == AAVD:
-            # replace aavd type with mp4a type
-            pack_into(fint[0], t.buf,  atomTypePosition, MP4A)
+        if atomType in [AAVD, MP4A]:
+            substitute_type = MP4A if atomType == AAVD else AAVD
+            pack_into(fint[0], t.buf,  atomTypePosition, substitute_type)
             t._readInto(inStream, blockCount * 4)
             t.write(outStream)
 
             for _ in range(blockCount):
-                outStream.write(_decrypt_aavd(inStream, key, iv, t))
+                if not encrypt:
+                    outStream.write(_decrypt_aavd(inStream, key, iv, t))
+                else:
+                    outStream.write(_encrypt_aavd(inStream, key, iv, t))
 
         else:
             length = t.write(outStream)
@@ -157,7 +170,7 @@ def _mdat_decrypter(inStream, outStream, length, t, key=None, iv=None, atomEnd=N
 
 _atomFuncs = {
     FTYP: _ftyp_writer,
-    MDAT: _mdat_decrypter,
+    MDAT: _mdat_handler,
     AAVD: _aavd_atom_handler,
     META: _meta_atom_handler,
     STSD: _stsd_atom_handler,
@@ -175,7 +188,8 @@ def _atomizer(
     outStream: BufferedWriter = None,
     eof: int = None,
     key=None,
-    iv=None
+    iv=None,
+    encrypt: bool = False,
 ):
     while inStream.tell() < eof:
         t = Translator()
@@ -191,6 +205,7 @@ def _atomizer(
             outStream=outStream,
             inStream=inStream,
             atomEnd=atomEnd,
+            encrypt=encrypt,
             length=length,
             key=key,
             iv=iv,
@@ -212,9 +227,9 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
             _atomizer(
-                inStream=src,
-                outStream=dest,
                 eof=path.getsize(src.name),
+                outStream=dest,
+                inStream=src,
                 key=key,
                 iv=iv,
             )

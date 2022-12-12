@@ -18,6 +18,11 @@ add(
     default=None,
 )
 add(
+    '--encrypt',
+    action='store_true',
+    help='Convert TO aax(c) rather than FROM',
+)
+add(
     'input',
     action='store',
     type=str,
