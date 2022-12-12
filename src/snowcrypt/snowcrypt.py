@@ -4,6 +4,7 @@ from os import path
 from hashlib import sha1
 from io import BufferedReader, BufferedWriter
 from typing import List
+from collections import defaultdict
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from binascii import hexlify
@@ -33,13 +34,13 @@ class Translator:
 
     def _readInto(self, inStream: BufferedReader, length: int or None) -> int:
         start = self.wpos
-        end = start + length
-        self.buf[start:end] = inStream.read(length)
+        self.buf[start:start + length] = inStream.read(length)
         self.wpos += length
         return length
 
-    def _write(self, inStream, out: BufferedWriter) -> int:
-        data = inStream[0: self.wpos]
+    def _write(self, out: BufferedWriter) -> int:
+        end = self.wpos
+        data = self.buf[0:end]
         out.write(data)
         return self.wpos
 
@@ -47,22 +48,8 @@ class Translator:
         atomLength = self._readOne(fint, inStream)
         return atomLength if atomLength != 1 else self._readOne(flong, inStream)
 
-    def _fillFtyp(self, inStream: BufferedReader, remaining: int, outStream: BufferedWriter):
-        self._readInto(inStream, remaining)
-        self.wpos += remaining
-        buf = bytearray(remaining)
-        pack_into(fint[0], buf, 0,  M4A)
-        pack_into(fint[0], buf, 4,  VERSION2_0)
-        pack_into(fint[0], buf, 8,  ISO2)
-        pack_into(fint[0], buf, 12, M4B)
-        pack_into(fint[0], buf, 16, MP42)
-        pack_into(fint[0], buf, 20, ISOM)
-        for i in range(24, remaining):
-            buf[i] = 0
-        self._write(buf, outStream)
 
-
-def _decrypt_aavd(inStream, key, iv, t):
+def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     # setup
     length = t._next(fint)
     aes = newAES(key, MODE_CBC, iv=iv)
@@ -76,8 +63,53 @@ def _decrypt_aavd(inStream, key, iv, t):
 
     return aes.decrypt(encryptedData) + unencryptedData
 
-def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key, iv):
-    while inStream.tell() < endPosition:
+
+def _meta_mask(inStream, outStream, length, t, **_):
+    t._readOne(fint, inStream)
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def _stsd_mask(inStream, outStream, length, t, **_):
+    t._readOne(flong, inStream)
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def _aavd_mask(inStream, outStream, length, t, atomPosition=None, **_):
+    # change container name so MP4 readers don't complain
+    pack_into(fint[0], t.buf, atomPosition, MP4A)
+    length -= t._write(outStream)
+    outStream.write(inStream.read(length))
+
+
+def _default_mask(inStream, outStream, length, t, **_):
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def _just_copy_it(inStream, outStream, length, t, **_):
+    length -= t._write(outStream)
+    outStream.write(inStream.read(length))
+
+
+def _ftyp_writer(inStream, outStream, length, t, **_):
+    length -= t._write(outStream)
+    buf = bytearray(length)
+    pos = 0
+    for tag in FTYP_TAGS:
+        pack_into(fint[0], buf, pos, tag)
+        pos += 4
+    for i in range(24, length):
+        buf[i] = 0
+    outStream.write(buf)
+    inStream.read(length)
+
+
+def _mdat_writer(inStream, outStream, length, t, key=None, iv=None, atomEnd=None, **_):
+    # this is the main work horse
+    t._write(outStream)
+    while inStream.tell() < atomEnd:
         t = Translator()
         atomLength = t._readAtomSize(inStream)
         atomTypePosition = t.pos
@@ -85,7 +117,8 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
 
         # after the atom type comes 5 additional fields describing the data.
         # We only care about the last two.
-        # skip time in ms, first block index, trak number, overall block size, block count
+        # skip (in order) time (in ms), first block index,
+        # trak number, overall block size, block count
         t._readOne(fint, inStream)
         t._readOne(fint, inStream)
         t._readOne(fint, inStream)
@@ -98,58 +131,58 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
             # replace aavd type with mp4a type
             pack_into(fint[0], t.buf,  atomTypePosition, MP4A)
             t._readInto(inStream, blockCount * 4)
-            t._write(t.buf, outStream)
+            t._write(outStream)
 
             for _ in range(blockCount):
                 outStream.write(_decrypt_aavd(inStream, key, iv, t))
 
         else:
-            length = t._write(t.buf, outStream)
-            _copy(inStream, atomLength +
-                  totalBlockSize - length, outStream)
+            length = t._write(outStream)
+            outStream.write(inStream.read(
+                atomLength + totalBlockSize - length))
 
 
-def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key=None, iv=None):
-    while inStream.tell() < endPosition:
+atomFuncs = {
+    FTYP: _ftyp_writer,
+    MDAT: _mdat_writer,
+    AAVD: _aavd_mask,
+    META: _meta_mask,
+    STSD: _stsd_mask,
+    MOOV: _default_mask,
+    TRAK: _default_mask,
+    MDIA: _default_mask,
+    MINF: _default_mask,
+    STBL: _default_mask,
+    UDTA: _default_mask,
+}
+
+
+def walk_atoms(
+    inStream: BufferedReader = None,
+    outStream: BufferedWriter = None,
+    eof: int = None,
+    key=None,
+    iv=None
+):
+    while inStream.tell() < eof:
         t = Translator()
         atomStart = inStream.tell()
-        atomLength = t._readAtomSize(inStream)
-        atomEnd = atomStart + atomLength
+        length = t._readAtomSize(inStream)
+        atomEnd = atomStart + length
         atomPosition = t.pos
         atomType = t._readOne(fint, inStream)
 
-        remaining = atomLength
-
-        if atomType == FTYP:
-            remaining -= t._write(t.buf, outStream)
-            t.pos, t.wpos = 0, 0
-            t._fillFtyp(inStream, remaining, outStream)
-        elif atomType == META:
-            t._readInto(inStream, 4)
-            t._write(t.buf, outStream)
-            walk_atoms(inStream, outStream, atomEnd)
-        elif atomType == STSD:
-            t._readInto(inStream, 8)
-            t._write(t.buf, outStream)
-            walk_atoms(inStream, outStream, atomEnd)
-        elif atomType == MDAT:
-            t._write(t.buf, outStream)
-            walk_mdat(inStream, outStream, atomEnd, key, iv)
-        elif atomType == AAVD:
-            pack_into(fint[0], t.buf, atomPosition, MP4A)  # mp4a
-            remaining -= t._write(t.buf, outStream)
-            _copy(inStream, remaining, outStream)
-        elif atomType in (MOOV,
-                          TRAK,
-                          MDIA,
-                          MINF,
-                          STBL,
-                          UDTA):
-            t._write(t.buf, outStream)
-            walk_atoms(inStream, outStream, atomEnd)
-        else:
-            remaining -= t._write(t.buf, outStream)
-            _copy(inStream, remaining, outStream)
+        func = atomFuncs.get(atomType, _just_copy_it)
+        func(
+            atomPosition=atomPosition,
+            outStream=outStream,
+            inStream=inStream,
+            atomEnd=atomEnd,
+            length=length,
+            key=key,
+            iv=iv,
+            t=t,
+        )
 
 
 def _decrypt(inStream: BufferedReader, outStream: BufferedWriter, key: bytes, iv: bytes):
@@ -247,17 +280,3 @@ def _sha(*bits: bytes, length: int = None):
 def _pad_16(data: bytes, length: int = 16) -> bytes:
     length = length - (len(data) % length)
     return data + bytes([length])*length
-
-
-def _copy(inStream: BufferedReader, length: int, *outs) -> int:
-    remaining = length
-    while remaining > 0:
-        remaining -= \
-            __write(inStream.read(min(remaining, 4096)), *outs)
-    return length
-
-
-def __write(buf, *outs: List[BufferedWriter]) -> int:
-    for out in outs:
-        out.write(buf)
-    return len(buf)
