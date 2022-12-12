@@ -64,8 +64,52 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     return aes.decrypt(encryptedData) + unencryptedData
 
 
-def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key, iv):
-    while inStream.tell() < endPosition:
+def _meta_mask(inStream, outStream, length, t, **_):
+    t._readOne(fint, inStream)
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def _stsd_mask(inStream, outStream, length, t, **_):
+    t._readOne(flong, inStream)
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def _aavd_mask(inStream, outStream, length, t, atomPosition=None, **_):
+    # change container name so MP4 readers don't complain
+    pack_into(fint[0], t.buf, atomPosition, MP4A)
+    length -= t._write(outStream)
+    outStream.write(inStream.read(length))
+
+
+def _default_mask(inStream, outStream, length, t, **_):
+    t._write(outStream)
+    walk_atoms(inStream, outStream, length)
+
+
+def _just_copy_it(inStream, outStream, length, t, **_):
+    length -= t._write(outStream)
+    outStream.write(inStream.read(length))
+
+
+def _ftyp_writer(inStream, outStream, length, t, **_):
+    length -= t._write(outStream)
+    buf = bytearray(length)
+    pos = 0
+    for tag in FTYP_TAGS:
+        pack_into(fint[0], buf, pos, tag)
+        pos += 4
+    for i in range(24, length):
+        buf[i] = 0
+    outStream.write(buf)
+    inStream.read(length)
+
+
+def _mdat_writer(inStream, outStream, length, t, key=None, iv=None, atomEnd=None, **_):
+    # this is the main work horse
+    t._write(outStream)
+    while inStream.tell() < atomEnd:
         t = Translator()
         atomLength = t._readAtomSize(inStream)
         atomTypePosition = t.pos
@@ -73,7 +117,8 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
 
         # after the atom type comes 5 additional fields describing the data.
         # We only care about the last two.
-        # skip time in ms, first block index, trak number, overall block size, block count
+        # skip (in order) time (in ms), first block index,
+        # trak number, overall block size, block count
         t._readOne(fint, inStream)
         t._readOne(fint, inStream)
         t._readOne(fint, inStream)
@@ -97,69 +142,29 @@ def walk_mdat(inStream: BufferedReader, outStream: BufferedWriter, endPosition: 
                 atomLength + totalBlockSize - length))
 
 
-def ftyp(inStream, outStream, length, t, **_):
-    length -= t._write(outStream)
-    buf = bytearray(length)
-    pos = 0
-    for tag in FTYP_TAGS:
-        pack_into(fint[0], buf, pos, tag)
-        pos += 4
-    for i in range(24, length):
-        buf[i] = 0
-    outStream.write(buf)
-    inStream.read(length)
-
-
-def meta(inStream, outStream, length, t, **_):
-    t._readOne(fint, inStream)
-    t._write(outStream)
-    walk_atoms(inStream, outStream, length)
-
-
-def stsd(inStream, outStream, length, t, **_):
-    t._readOne(flong, inStream)
-    t._write(outStream)
-    walk_atoms(inStream, outStream, length)
-
-
-def mdat(inStream, outStream, length, t, key=None, iv=None, atomEnd=None, **_):
-    t._write(outStream)
-    walk_mdat(inStream, outStream, atomEnd, key, iv)
-
-
-def aavd(inStream, outStream, length, t, atomPosition=None, **_):
-    # change container name so MP4 readers don't complain
-    pack_into(fint[0], t.buf, atomPosition, MP4A)
-    length -= t._write(outStream)
-    outStream.write(inStream.read(length))
-
-
-def bulk(inStream, outStream, length, t, **_):
-    t._write(outStream)
-    walk_atoms(inStream, outStream, length)
-
-
-def just_copy_it(inStream, outStream, length, t, **_):
-    length -= t._write(outStream)
-    outStream.write(inStream.read(length))
-
-
 atomFuncs = {
-    FTYP: ftyp,
-    META: meta,
-    STSD: stsd,
-    MDAT: mdat,
-    AAVD: aavd,
-    MOOV: bulk,
-    TRAK: bulk,
-    MDIA: bulk,
-    MINF: bulk,
-    STBL: bulk,
-    UDTA: bulk,
+    FTYP: _ftyp_writer,
+    MDAT: _mdat_writer,
+    AAVD: _aavd_mask,
+    META: _meta_mask,
+    STSD: _stsd_mask,
+    MOOV: _default_mask,
+    TRAK: _default_mask,
+    MDIA: _default_mask,
+    MINF: _default_mask,
+    STBL: _default_mask,
+    UDTA: _default_mask,
 }
 
-def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition: int, key=None, iv=None):
-    while inStream.tell() < endPosition:
+
+def walk_atoms(
+    inStream: BufferedReader = None,
+    outStream: BufferedWriter = None,
+    eof: int = None,
+    key=None,
+    iv=None
+):
+    while inStream.tell() < eof:
         t = Translator()
         atomStart = inStream.tell()
         length = t._readAtomSize(inStream)
@@ -167,7 +172,7 @@ def walk_atoms(inStream: BufferedReader, outStream: BufferedWriter, endPosition:
         atomPosition = t.pos
         atomType = t._readOne(fint, inStream)
 
-        func = atomFuncs.get(atomType, just_copy_it)
+        func = atomFuncs.get(atomType, _just_copy_it)
         func(
             atomPosition=atomPosition,
             outStream=outStream,
