@@ -63,36 +63,36 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
 
 
 def _meta_mask(inStream, outStream, length, t, **_):
-    t._readOne(fint, inStream)
-    t._write(outStream)
+    t.readOne(fint, inStream)
+    t.write(outStream)
     _atomizer(inStream, outStream, length)
 
 
 def _stsd_mask(inStream, outStream, length, t, **_):
-    t._readOne(flong, inStream)
-    t._write(outStream)
+    t.readOne(flong, inStream)
+    t.write(outStream)
     _atomizer(inStream, outStream, length)
 
 
 def _aavd_mask(inStream, outStream, length, t, atomPosition=None, **_):
     # change container name so MP4 readers don't complain
     pack_into(fint[0], t.buf, atomPosition, MP4A)
-    length -= t._write(outStream)
+    length -= t.write(outStream)
     outStream.write(inStream.read(length))
 
 
 def _default_mask(inStream, outStream, length, t, **_):
-    t._write(outStream)
+    t.write(outStream)
     _atomizer(inStream, outStream, length)
 
 
 def _just_copy_it(inStream, outStream, length, t, **_):
-    length -= t._write(outStream)
+    length -= t.write(outStream)
     outStream.write(inStream.read(length))
 
 
 def _ftyp_writer(inStream, outStream, length, t, **_):
-    length -= t._write(outStream)
+    length -= t.write(outStream)
     buf = bytearray(length)
     pos = 0
     for tag in FTYP_TAGS:
@@ -106,7 +106,7 @@ def _ftyp_writer(inStream, outStream, length, t, **_):
 
 def _mdat_writer(inStream, outStream, length, t, key=None, iv=None, atomEnd=None, **_):
     # this is the main work horse
-    t._write(outStream)
+    t.write(outStream)
     while inStream.tell() < atomEnd:
         t = Translator()
         atomLength = t.readAtomSize(inStream)
