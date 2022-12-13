@@ -1,6 +1,35 @@
-# Abstract
+# Acknowledgements
+Snowcrypt stands on the shoulders of giants.
 
-snowcrypt is a tool to decrypt audible files for which you have a valid license.
+Many tools for decrypting Audible files already exist.
+FFMPEG of course can handle it.
+Several options (open- and closed-source) are just a frontend for FFMPEG.
+
+A couple have even written indepentant implementations,
+such as Mbucari in C# as [AAXClean](https://github.com/Mbucari/AAXClean).
+These were an invaluable asset while creating snowcrypt.
+
+The original code base and algorithm for snowcrypt
+was written in Java and ported to Python by github user BlindWanderer.
+They posted it in response to [this](https://github.com/mkb79/Audible/issues/36) issue.
+
+# Abstract
+snowcrypt a pure Python decryption of Audible's .aax and .aaxc file format.
+snowcrypt can only decrypt files for which you have a valid license.
+
+# Why not just use FFMPEG?
+In a word: simplicity.
+FFMPEG is a wonderful tool from great developers.
+Unfortunately, it's also somewhat fragmented in it's version install base,
+so often the first instruction is "make sure you have X.X version installed."
+With snowcrypt, you don't have to worry about any of that.
+If you can install Python (which is MUCH easier),
+you can install and use snowcrypt.
+
+Note:
+If you're looking for speed, FFMPEG is the better option.
+Overall, snowcrypt is between half and a third as fast as FFMPEG.
+
 
 # Installation
 
