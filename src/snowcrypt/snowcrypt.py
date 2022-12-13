@@ -121,12 +121,12 @@ def _ftyp_writer(inStream, outStream, length, t, **_):
 
 
 def _mdat_handler(
-        inStream,
-        outStream,
-        length,
-        t,
-        encrypt=False,
-        atomEnd=None,
+        inStream: BufferedReader,
+        outStream: BufferedWriter,
+        length: int,
+        t: Translator,
+        encrypt: bool = False,
+        atomEnd: int = None,
         key=None,
         iv=None,
         ** _,
