@@ -3,7 +3,7 @@ import sys
 from os import path
 
 from .snowcrypt import decrypt_aaxc, deriveKeyIV
-from .localExceptions import NotDecryptable
+from .localExceptions import NotDecryptable, NotAnAudibleFile
 from .myparser import arg
 from .tinytag import MP4
 
@@ -35,8 +35,17 @@ def main():
                 'content_license']['license_response']
             key, iv = license['key'], license['iv']
 
+    elif infile.endswith('.m4a') and arg('encrypt'):
+        activation_bytes = arg('bytes')
+        if not activation_bytes:
+            raise NotDecryptable(
+                'Must supply activation_bytes to encrypt.')
+
+        with open(infile, 'rb') as f:
+            key, iv = deriveKeyIV(f, activation_bytes)
+
     else:
-        raise NotDecryptable(
+        raise NotAnAudibleFile(
             str(infile) +
             "The file you provided doesn't end with '.aax' or '.aaxc'. " +
             "Please supply one that does.")
@@ -51,3 +60,7 @@ def main():
         key if not arg('key') else arg('key'),
         iv if not arg('iv') else arg('iv'),
     )
+
+
+if __name__ == "__main__":
+    main()
