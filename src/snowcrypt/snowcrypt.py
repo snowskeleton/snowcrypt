@@ -142,6 +142,7 @@ def _mdat_handler(
     """
     # this is the main work horse
     t.write(outStream)
+    func = _decrypt_aavd if not encrypt else _encrypt_aavd
     while inStream.tell() < atomEnd:
         t = Translator()
         atom_length = t.readAtomSize(inStream)
@@ -167,10 +168,7 @@ def _mdat_handler(
             t.write(outStream)
 
             for _ in range(block_count):
-                if not encrypt:
-                    outStream.write(_decrypt_aavd(inStream, key, iv, t))
-                else:
-                    outStream.write(_encrypt_aavd(inStream, key, iv, t))
+                outStream.write(func(inStream, key, iv, t))
 
         else:
             offset = t.write(outStream)
