@@ -135,9 +135,9 @@ def _mdat_handler(
     t.write(outStream)
     while inStream.tell() < atomEnd:
         t = Translator()
-        atomLength = t.readAtomSize(inStream)
+        atom_length = t.readAtomSize(inStream)
         atomTypePosition = t.pos
-        atomType = t.readOne(fint, inStream)
+        atom_type = t.readOne(fint, inStream)
 
         # after the atom type comes 5 additional fields describing the data.
         # We only care about the last two.
@@ -146,27 +146,27 @@ def _mdat_handler(
         t.readOne(fint, inStream)
         t.readOne(fint, inStream)
         t.readOne(fint, inStream)
-        totalBlockSize = t.readOne(fint, inStream)
-        blockCount = t.readOne(fint, inStream)
+        sum_block_length = t.readOne(fint, inStream)
+        block_count = t.readOne(fint, inStream)
 
         # next come the atom specific fields
         # aavd has a list of sample sizes and then the samples.
-        if atomType in [AAVD, MP4A]:
-            substitute_type = MP4A if atomType == AAVD else AAVD
+        if atom_type in [AAVD, MP4A]:
+            substitute_type = MP4A if atom_type == AAVD else AAVD
             pack_into(fint[0], t.buf,  atomTypePosition, substitute_type)
-            t._readInto(inStream, blockCount * 4)
+            t._readInto(inStream, block_count * 4)
             t.write(outStream)
 
-            for _ in range(blockCount):
+            for _ in range(block_count):
                 if not encrypt:
                     outStream.write(_decrypt_aavd(inStream, key, iv, t))
                 else:
                     outStream.write(_encrypt_aavd(inStream, key, iv, t))
 
         else:
-            length = t.write(outStream)
+            offset = t.write(outStream)
             outStream.write(inStream.read(
-                atomLength + totalBlockSize - length))
+                atom_length + sum_block_length - offset))
 
 
 _atomFuncs = {
