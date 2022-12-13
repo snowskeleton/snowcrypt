@@ -3,11 +3,12 @@ from struct import unpack_from, pack_into
 from os import path
 from hashlib import sha1
 from io import BufferedReader, BufferedWriter
-
-from Crypto.Cipher.AES import MODE_CBC, new as newAES
+from math import isclose
 from binascii import hexlify
 
-from .localExceptions import CredentialMismatch
+from Crypto.Cipher.AES import MODE_CBC, new as newAES
+
+from .localExceptions import CredentialMismatch, DecryptionFailure
 from .constants import *
 
 
@@ -233,6 +234,10 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
                 key=key,
                 iv=iv,
             )
+            s1 = path.getsize(src.name)
+            s2 = path.getsize(dest.name)
+            if isclose(s1, s2):
+                raise DecryptionFailure(f'Failed.\n{s1}\n{s2}')
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
