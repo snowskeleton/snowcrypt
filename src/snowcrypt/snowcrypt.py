@@ -131,6 +131,15 @@ def _mdat_handler(
         iv=None,
         ** _,
 ):
+    """
+    description of MDAT atom in .aax and .aaxc files
+    size.......   type (aavd)   empty......   empty......
+    00 00 00 48   61 61 76 64   00 00 00 00   00 00 00 00
+    empty......   sum blk len   block count
+    00 00 00 00   00 00 01 6c   00 00 01 6c ...
+    the rest of the atom is an encrypted AAC audio sample with the above values
+    MDAT atoms may contain any number of AAVD atoms, each with the above description
+    """
     # this is the main work horse
     t.write(outStream)
     while inStream.tell() < atomEnd:
