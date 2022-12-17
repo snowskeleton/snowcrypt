@@ -77,6 +77,9 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
 
     return aes.decrypt(encryptedData) + unencryptedData
 
+# Atom handlers called programatically.
+# Add a new one with the format "_<name>_atom_handler"
+# and accept the same arguments as the other handlers
 
 def _meta_atom_handler(inStream, outStream, length, t, **_):
     t.readOne(fint, inStream)
@@ -175,6 +178,8 @@ def _mdat_atom_handler(
             offset = t.write(outStream)
             outStream.write(inStream.read(
                 atom_length + sum_block_length - offset))
+
+# End of handlers
 
 
 _atomFuncs = {
