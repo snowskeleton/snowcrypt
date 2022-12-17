@@ -210,7 +210,6 @@ def _atomizer(
         t = Translator()
         atomStart = inStream.tell()
         length = t.readAtomSize(inStream)
-        atomEnd = atomStart + length
         atomPosition = t.pos
         atomType = t.readOne(fint, inStream)
 
@@ -219,7 +218,7 @@ def _atomizer(
             atomPosition=atomPosition,
             outStream=outStream,
             inStream=inStream,
-            atomEnd=atomEnd,
+            atomEnd=atomStart + length,
             encrypt=encrypt,
             length=length,
             key=key,
