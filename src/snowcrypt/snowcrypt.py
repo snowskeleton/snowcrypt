@@ -201,6 +201,7 @@ def _atomizer(
     encrypt: bool = False,
 ):
     while inStream.tell() < eof:
+        eof = eof if eof is not None else path.getsize(inStream.name)
         t = Translator()
         atomStart = inStream.tell()
         length = t.readAtomSize(inStream)
@@ -236,7 +237,6 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
             _atomizer(
-                eof=path.getsize(src.name),
                 outStream=dest,
                 inStream=src,
                 key=key,
