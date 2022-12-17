@@ -162,6 +162,7 @@ def _mdat_handler(
         # next come the atom specific fields
         # aavd has a list of sample sizes and then the samples.
         if atom_type in [AAVD, MP4A]:
+            # change t.buf's atom_type from AAVD to MP4A or vice versa
             substitute_type = MP4A if atom_type == AAVD else AAVD
             pack_into(fint[0], t.buf,  atomTypePosition, substitute_type)
             t._readInto(inStream, block_count * 4)
@@ -170,7 +171,7 @@ def _mdat_handler(
             for _ in range(block_count):
                 outStream.write(func(inStream, key, iv, t))
 
-        else:
+        else:  # TEXT atom
             offset = t.write(outStream)
             outStream.write(inStream.read(
                 atom_length + sum_block_length - offset))
