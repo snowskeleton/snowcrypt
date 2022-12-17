@@ -120,7 +120,7 @@ def _ftyp_writer(inStream, outStream, length, t, **_):
     inStream.read(length)
 
 
-def _mdat_handler(
+def _mdat_atom_handler(
         inStream: BufferedReader,
         outStream: BufferedWriter,
         length: int,
@@ -179,7 +179,7 @@ def _mdat_handler(
 
 _atomFuncs = {
     FTYP: _ftyp_writer,
-    MDAT: _mdat_handler,
+    MDAT: _mdat_atom_handler,
     AAVD: _aavd_atom_handler,
     META: _meta_atom_handler,
     STSD: _stsd_atom_handler,
