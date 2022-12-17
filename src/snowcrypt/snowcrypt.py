@@ -200,8 +200,8 @@ def _atomizer(
     iv=None,
     encrypt: bool = False,
 ):
+    eof = eof if eof is not None else path.getsize(inStream.name)
     while inStream.tell() < eof:
-        eof = eof if eof is not None else path.getsize(inStream.name)
         t = Translator()
         atomStart = inStream.tell()
         length = t.readAtomSize(inStream)
