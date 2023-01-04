@@ -1,5 +1,6 @@
 import json
-import concurrent.futures as cf
+import threading
+
 from os import path
 from typing import Tuple
 
@@ -9,7 +10,22 @@ from .myparser import arg
 from .tinytag import MP4
 
 
-def _process_file(file) -> list:
+def main():
+    files = arg('input')
+    threads = [
+        threading.Thread(
+            target=decrypt_aaxc,
+            args=(_get_args_for(file))
+        ) for file in files
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()  # waits for thread to complete its task
+
+
+# main()
+def _get_args_for(file):
     infile: str = file
     if not isaax(infile) and not isaaxc(infile):
         raise NotAnAudibleFile(
@@ -17,29 +33,16 @@ def _process_file(file) -> list:
             "The file you provided doesn't end with '.aax' or '.aaxc'. " +
             "Please supply one that does.")
 
-    key, iv = determine_key_iv(infile, arg(
-        'bytes') if isaax(infile) else None,)
+    key, iv = determine_key_iv(
+        infile,
+        arg('bytes') if isaax(infile) else None,
+    )
 
     tags = MP4.get(infile, encoding='MP4')
     title = tags.title.replace(' (Unabridged)', '')
     outfile = title + '.m4a'
 
-    return [
-        decrypt_aaxc,
-        [
-            infile,
-            outfile,
-            key,
-            iv,
-        ]]
-
-
-def main():
-    jobs = []
-    for file in arg('input'):
-        jobs.append(_process_file(file))
-    with cf.ProcessPoolExecutor() as executor:
-        _ = [executor.submit(*job) for job in jobs]
+    return [infile, outfile, key, iv]
 
 
 def determine_key_iv(
