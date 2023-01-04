@@ -1,6 +1,6 @@
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
+import os
 from struct import unpack_from, pack_into
-from os import path
 from hashlib import sha1
 from io import BufferedReader, BufferedWriter
 from math import isclose
@@ -17,7 +17,7 @@ fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
 
 class Translator:
     def __init__(self, size: int = None):
-        self.buf = bytearray(size if size != None else 4096)
+        self.buf = bytearray(size if size is not None else 4096)
         self.pos, self.wpos = 0, 0
 
     def _readInto(self, inStream: BufferedReader, length: int or None) -> int:
@@ -80,6 +80,7 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
 # Atom handlers called programatically.
 # Add a new one with the format "_<name>_atom_handler"
 # and accept the same arguments as the other handlers
+
 
 def _meta_atom_handler(inStream, outStream, length, t, **_):
     t.readOne(fint, inStream)
@@ -168,7 +169,11 @@ def _mdat_atom_handler(
             # change t.buf's atom_type from AAVD to MP4A or vice versa
             substitute_type = MP4A if atom_type == AAVD else AAVD
             pack_into(fint[0], t.buf,  atomTypePosition, substitute_type)
+
+            # sample sizes
             t._readInto(inStream, block_count * 4)
+
+            # flush buffer
             t.write(outStream)
 
             for _ in range(block_count):
@@ -205,7 +210,7 @@ def _atomizer(
     iv=None,
     encrypt: bool = False,
 ):
-    eof = eof if eof is not None else path.getsize(inStream.name)
+    eof = eof if eof is not None else os.path.getsize(inStream.name)
     while inStream.tell() < eof:
         t = Translator()
         atomStart = inStream.tell()
@@ -236,6 +241,9 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
         key (int): AES key
         iv (int): AES initialization vector
     """
+    if not os.path.exists(inpath):
+        raise FileNotFoundError(inpath)
+
     key = bytes.fromhex(key)
     iv = bytes.fromhex(iv)
     with open(inpath, 'rb') as src:
@@ -246,10 +254,12 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
                 key=key,
                 iv=iv,
             )
-            s1 = path.getsize(src.name)
-            s2 = path.getsize(dest.name)
+            s1 = os.path.getsize(src.name)
+            s2 = os.path.getsize(dest.name)
             if isclose(s1, s2):
-                raise DecryptionFailure(f'Failed.\n{s1}\n{s2}')
+                msg = f'"{dest.name}" size of {s2} '
+                f'does not match "{src.name}" size of {s1}'
+                raise DecryptionFailure(msg)
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
@@ -261,6 +271,9 @@ def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
         outpath (str): file path to output
         activation_bytes (str): decryption bytes unique to your account
     """
+    if not os.path.exists(inpath):
+        raise FileNotFoundError(inpath)
+
     with open(inpath, 'rb') as inStream:
         key, iv = deriveKeyIV(inStream, activation_bytes)
     decrypt_aaxc(inpath, outpath, key, iv)

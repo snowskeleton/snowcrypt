@@ -33,7 +33,8 @@ add(
     '--iv', '-i',
     action='store',
     type=str,
-    help='AES decryption initialization vector. Used instead of voucher or key derivation.',
+    help='AES decryption initialization vector. '
+    'Used instead of voucher or key derivation.',
     default=None
 )
 add(
