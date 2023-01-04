@@ -35,10 +35,11 @@ def _process_file(file) -> list:
 
 
 def main():
+    jobs = []
     for file in arg('input'):
-        job = _process_file(file)
-        with cf.ProcessPoolExecutor() as executor:
-            _ = [executor.submit(*job)]
+        jobs.append(_process_file(file))
+    with cf.ProcessPoolExecutor() as executor:
+        _ = [executor.submit(*job) for job in jobs]
 
 
 def determine_key_iv(
