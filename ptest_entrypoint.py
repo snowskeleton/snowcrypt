@@ -2,4 +2,7 @@
 from src.tests import test__decrypt
 import sys
 
-sys.exit(test__decrypt.main())
+try:
+    sys.exit(test__decrypt.main())
+except KeyboardInterrupt:
+    print('\nReceived escape sequence')

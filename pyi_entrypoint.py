@@ -2,4 +2,7 @@
 from src.snowcrypt import main
 import sys
 
-sys.exit(main.main())
+try:
+    sys.exit(main.main())
+except KeyboardInterrupt:
+    print('\nReceived escape sequence')
