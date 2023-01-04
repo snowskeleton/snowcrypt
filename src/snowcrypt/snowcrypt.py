@@ -5,6 +5,7 @@ from hashlib import sha1
 from io import BufferedReader, BufferedWriter
 from math import isclose
 from binascii import hexlify
+from typing import Tuple
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 
@@ -48,21 +49,6 @@ class Translator:
         return self.wpos
 
 
-def _encrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
-    # setup
-    length = t.next(fint)
-    aes = newAES(key, MODE_CBC, iv=iv)
-
-    # for cipher padding, (up to) last 2 bytes are unencrypted
-    encryptedLength = length & 0xFFFFFFF0
-    unencryptedLength = length & 0x0000000F
-
-    encryptedData = inStream.read(encryptedLength)
-    unencryptedData = inStream.read(unencryptedLength)
-
-    return aes.encrypt(encryptedData) + unencryptedData
-
-
 def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     # setup
     length = t.next(fint)
@@ -75,7 +61,8 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     encryptedData = inStream.read(encryptedLength)
     unencryptedData = inStream.read(unencryptedLength)
 
-    return aes.decrypt(encryptedData) + unencryptedData
+    data = aes.decrypt(encryptedData) + unencryptedData
+    return data
 
 # Atom handlers called programatically.
 # Add a new one with the format "_<name>_atom_handler"
@@ -146,7 +133,6 @@ def _mdat_atom_handler(
     """
     # this is the main work horse
     t.write(outStream)
-    func = _decrypt_aavd if not encrypt else _encrypt_aavd
     while inStream.tell() < atomEnd:
         t = Translator()
         atom_length = t.readAtomSize(inStream)
@@ -177,7 +163,8 @@ def _mdat_atom_handler(
             t.write(outStream)
 
             for _ in range(block_count):
-                outStream.write(func(inStream, key, iv, t))
+                decrypted_block = _decrypt_aavd(inStream, key, iv, t)
+                outStream.write(decrypted_block)
 
         else:  # TEXT atom
             offset = t.write(outStream)
@@ -220,10 +207,10 @@ def _atomizer(
 
         func = _atomFuncs.get(atomType, _just_copy_it)
         func(
+            atomEnd=atomStart + length,
             atomPosition=atomPosition,
             outStream=outStream,
             inStream=inStream,
-            atomEnd=atomStart + length,
             encrypt=encrypt,
             length=length,
             key=key,
@@ -274,8 +261,7 @@ def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
     if not os.path.exists(inpath):
         raise FileNotFoundError(inpath)
 
-    with open(inpath, 'rb') as inStream:
-        key, iv = deriveKeyIV(inStream, activation_bytes)
+    key, iv = key_and_iv_for_file_with_abytes(inpath, activation_bytes)
     decrypt_aaxc(inpath, outpath, key, iv)
 
 
@@ -316,6 +302,12 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
     inStream.seek(file_start)
 
     return _bts(fileKey), _bts(inVect)
+
+
+def key_and_iv_for_file_with_abytes(file: str, activation_bytes: str) -> Tuple:
+    """convenience function for key derivation"""
+    with open(file, 'rb') as f:
+        return deriveKeyIV(f, activation_bytes)
 
 
 def _key_mask(data: bytes):

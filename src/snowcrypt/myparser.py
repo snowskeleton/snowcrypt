@@ -25,6 +25,7 @@ add(
 add(
     'input',
     action='store',
+    nargs='+',
     type=str,
     help='File to be converted',
     default='',
