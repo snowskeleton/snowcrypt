@@ -1,5 +1,5 @@
 import json
-import asyncio
+import concurrent.futures as cf
 from os import path
 from typing import Tuple
 
@@ -9,40 +9,36 @@ from .myparser import arg
 from .tinytag import MP4
 
 
-def main():
-    asyncio.run(othermain())
+def _process_file(file) -> list:
+    infile: str = file
+    if not isaax(infile) and not isaaxc(infile):
+        raise NotAnAudibleFile(
+            infile +
+            "The file you provided doesn't end with '.aax' or '.aaxc'. " +
+            "Please supply one that does.")
 
+    key, iv = determine_key_iv(infile, arg(
+        'bytes') if isaax(infile) else None,)
 
-async def itter() -> str:
-    for i in arg('input'):
-        yield i
+    tags = MP4.get(infile, encoding='MP4')
+    title = tags.title.replace(' (Unabridged)', '')
+    outfile = title + '.m4a'
 
-
-async def othermain():
-    async for file in itter():
-        infile: str = file
-
-        if not isaax(infile) and not isaaxc(infile):
-            raise NotAnAudibleFile(
-                infile +
-                "The file you provided doesn't end with '.aax' or '.aaxc'. " +
-                "Please supply one that does.")
-
-        key, iv = determine_key_iv(
-            infile,
-            arg('bytes') if isaax(infile) else None,
-        )
-
-        tags = MP4.get(infile, encoding='MP4')
-        title = tags.title.replace(' (Unabridged)', '')
-        outfile = title + '.m4a'
-
-        decrypt_aaxc(
+    return [
+        decrypt_aaxc,
+        [
             infile,
             outfile,
-            key if not arg('key') else arg('key'),
-            iv if not arg('iv') else arg('iv'),
-        )
+            key,
+            iv,
+        ]]
+
+
+def main():
+    for file in arg('input'):
+        job = _process_file(file)
+        with cf.ProcessPoolExecutor() as executor:
+            _ = [executor.submit(*job)]
 
 
 def determine_key_iv(
