@@ -1,5 +1,6 @@
 import json
 import queue
+import threading
 
 from os import path
 from typing import Tuple
@@ -11,20 +12,34 @@ from .tinytag import MP4
 
 
 def main():
-    q = queue.Queue(maxsize=8)
-    files = arg('input')
-    for file in files:
-        q.put({
-            'task': decrypt_aaxc,
-            'args': _get_args_for(file)
-        })
+    class MyThreads(threading.Thread):
 
-    while not q.empty():
-        job = q.get()
-        job['task'](*job['args'])
+        def __init__(self) -> None:
+            threading.Thread.__init__(self)
+
+        def run(self):
+            eatTheQueen()
+
+    def eatTheQueen():
+        while not q.empty():
+            print("Eating a queen")
+            file = q.get()
+            decrypt_aaxc(*_get_args_for(file))
+
+    q = queue.Queue()
+    [q.put(file) for file in arg('input')]
+
+    threads = [MyThreads() for _ in range(8)]
+    for thread in threads:
+        if not q.empty():
+            print("starting a thread")
+            thread.start()
+
+    for thread in threads:
+        print("joining a thread")
+        thread.join() if thread.is_alive() else None
 
 
-# main()
 def _get_args_for(file) -> list:
     infile: str = file
     if not isaax(infile) and not isaaxc(infile):
