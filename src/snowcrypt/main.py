@@ -1,5 +1,5 @@
 import json
-import threading
+import queue
 
 from os import path
 from typing import Tuple
@@ -11,21 +11,21 @@ from .tinytag import MP4
 
 
 def main():
+    q = queue.Queue(maxsize=8)
     files = arg('input')
-    threads = [
-        threading.Thread(
-            target=decrypt_aaxc,
-            args=(_get_args_for(file))
-        ) for file in files
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()  # waits for thread to complete its task
+    for file in files:
+        q.put({
+            'task': decrypt_aaxc,
+            'args': _get_args_for(file)
+        })
+
+    while not q.empty():
+        job = q.get()
+        job['task'](*job['args'])
 
 
 # main()
-def _get_args_for(file):
+def _get_args_for(file) -> list:
     infile: str = file
     if not isaax(infile) and not isaaxc(infile):
         raise NotAnAudibleFile(
