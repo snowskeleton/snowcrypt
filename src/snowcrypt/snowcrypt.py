@@ -243,7 +243,7 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
             )
             s1 = os.path.getsize(src.name)
             s2 = os.path.getsize(dest.name)
-            if isclose(s1, s2):
+            if not isclose(s1, s2, rel_tol=0.10):
                 msg = f'"{dest.name}" size of {s2} '
                 msg += f'does not match "{src.name}" size of {s1}'
                 raise DecryptionFailure(msg)
