@@ -1,7 +1,9 @@
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
 import os
+import shutil
 from io import BufferedReader, BufferedWriter
 from math import isclose
+from random import random
 from struct import unpack_from, pack_into
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
@@ -134,8 +136,6 @@ class Handler:
                 # flush buffer
                 t.write(outStream)
 
-                if block_count != 11:
-                    print(block_count)
                 for _ in range(block_count):
                     decrypted_block = _decrypt_aavd(inStream, key, iv, t)
                     outStream.write(decrypted_block)
@@ -221,8 +221,9 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
 
     key = bytes.fromhex(key)
     iv = bytes.fromhex(iv)
+    temppath = f'.snowcrypt.temp.{random()}'
     with open(inpath, 'rb') as src:
-        with open(outpath, 'wb') as dest:
+        with open(temppath, 'wb') as dest:
             _atomizer(
                 outStream=dest,
                 inStream=src,
@@ -235,6 +236,7 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
                 msg = f'"{dest.name}" size of {s2} '
                 msg += f'does not match "{src.name}" size of {s1}'
                 raise DecryptionFailure(msg)
+    shutil.move(temppath, outpath)
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
