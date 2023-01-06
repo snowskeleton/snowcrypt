@@ -1,6 +1,4 @@
 import json
-import queue
-import threading
 import logging
 
 from os import path
@@ -13,33 +11,31 @@ from .localExceptions import NotDecryptable, NotAnAudibleFile
 from .myparser import arg
 from .tinytag import MP4
 
+from multiprocessing import Pool
+
+
+def helper(input):
+    infile, _, _, _ = [*input]
+    logging.info(f"Starting: {infile}")
+    then = datetime.now()
+    decrypt_aaxc(*input)
+    now = datetime.now()
+    delta = now - then
+    if delta.seconds != 0:
+        delta = delta.seconds
+    else:
+        delta = delta.microseconds
+    fraction = delta / path.getsize(infile)
+    logging.info(f"Finished: {infile}. Total seconds: {fraction}")
+
 
 def main():
-    class MyThreads(threading.Thread):
-        def run(self):
-            while not q.empty():
-                file = q.get()
-                logging.info(f"Starting: {file}")
-                then = datetime.now()
-                decrypt_aaxc(*_get_args_for(file))
-                now = datetime.now()
-                delta = now - then
-                if delta.seconds != 0:
-                    delta = delta.seconds
-                else:
-                    delta = delta.microseconds
-                logging.info(f"Finished: {file}. Total seconds: {delta}")
-
-    q = queue.Queue()
-    [q.put(file) for file in arg('input')]
-
-    threads = [MyThreads() for _ in range(arg('thread_count'))]
-    for thread in threads:
-        if not q.empty():
-            thread.start()
-
-    for thread in threads:
-        thread.join() if thread.is_alive() else None
+    iterables = [
+        [*_get_args_for(file)]
+        for file in arg('input')
+    ]
+    with Pool(arg('thread_count')) as pool:
+        pool.map(helper, iterables)
 
 
 def _get_args_for(file) -> list:
