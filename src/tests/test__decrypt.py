@@ -2,8 +2,9 @@
 # import filecmp
 # import signal
 # import unittest
-# from ..snowcrypt.snowcrypt import decrypt_aaxc as newcrypt
-# from ..snowcrypt.oldcrypt import decrypt_aaxc as oldcrypt
+# from ..snowcrypt.snowcrypt import decrypt_aaxc
+# from ..snowcrypt.snowcrypt import decrypt_aax
+# from ..snowcrypt.oldcrypt import decrypt_aaxc as old_decrypt_aaxc
 
 # from .constants import *
 # from ..snowcrypt.localExceptions import NotDecryptable, DecryptionFailure, NotAnAudibleFile
@@ -14,11 +15,11 @@
 
 
 # contestents = [{
-#     'func': newcrypt,
+#     'func': decrypt_aaxc,
 #     'args': StormAAXC,
 #     # 'args': EsperoAAX,
 # }, {
-#     'func': oldcrypt,
+#     'func': old_decrypt_aaxc,
 #     'args': ControlStormAAXC,
 #     # 'args': ControlEsperoAAX,
 # }]
@@ -29,25 +30,33 @@
 
 # class MyTestCases(unittest.TestCase):
 #     def test__same_as_legacy(self):
-#         try:
-#             signal.signal(signal.SIGALRM, handler)
-#             signal.alarm(5)
-#             one, two = race(contestents, 5)
-#             if not filecmp.cmp(file1, file2):
-#                 raise EncryptionFailure('Encryption Failed')
+#         signal.signal(signal.SIGALRM, handler)
+#         signal.alarm(30)
+#         precryptName1 = 'The_Gathering_Storm_Interview_with_the_Narrators-LC_64_22050_stereo.aax'
+#         postcryptName1 = 'The Gathering Storm: Interview with the Narrators.m4a'
+#         abytes = 'b2760503'
+#         decrypt_aax(precryptName1, postcryptName1, abytes)
 
-#             one = str(one)[:5]
-#             two = str(two)[:5]
-#             diff = abs(float(one) - float(two))
-#             if diff > 0.10:
-#                 msg = '\nnew : ' + one
-#                 msg += '\nold : ' + two
-#                 msg += '\ndif : ' + str(diff)
-#                 raise SignificantTimeDifference(msg)
-#         except KeyboardInterrupt:
-#             print('\nReceived escape sequence')
-#         finally:
-#             signal.alarm(0)          # Disable the alarm
+#         # control
+#         precryptName2 = 'The_Gathering_Storm_Interview_with_the_Narrators-LC_64_22050_stereo.aax'
+#         postcryptName2 = 'The Gathering Storm: Interview with the Narrators-control.m4a'
+#         key = 'f1c443f8db16304d24edc1245e278eaf'
+#         iv = '9024b63436da4986ec5ac1f56729c0e4'
+
+#         old_decrypt_aaxc(precryptName2, postcryptName2, key, iv)
+
+#         if not filecmp.cmp(postcryptName1, postcryptName2):
+#             raise EncryptionFailure('Encryption Failed')
+
+#         signal.alarm(0)          # Disable the alarm
+
+#     def test__key_iv_from_file(self):
+#         from ..snowcrypt.snowcrypt import key_and_iv_for_file_with_abytes
+#         precryptName = 'The_Gathering_Storm_Interview_with_the_Narrators-LC_64_22050_stereo.aax'
+#         abytes = 'b2760503'
+#         key, iv = key_and_iv_for_file_with_abytes(precryptName, abytes)
+#         self.assertIsNotNone(key)
+#         self.assertIsNotNone(iv)
 
 
 # def main():
