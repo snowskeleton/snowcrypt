@@ -3,7 +3,7 @@ from io import BytesIO
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 from ..snowcrypt.constants import FIXEDKEY, ADRM_START, ADRM_LENGTH
 from ..snowcrypt.localExceptions import CredentialMismatch
-from ..snowcrypt.snowcrypt import deriveKeyIV, _sha, _swapEndian, _pad_16
+from ..snowcrypt.adrm_key_derivation import deriveKeyIV, _sha, _swapEndian, _pad_16
 from .constants import TEST_BYTES
 
 
