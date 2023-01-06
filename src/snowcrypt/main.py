@@ -7,7 +7,8 @@ from os import path
 from datetime import datetime
 from typing import Tuple
 
-from .snowcrypt import decrypt_aaxc, key_and_iv_for_file_with_abytes
+from .adrm_key_derivation import key_and_iv_for_file_with_abytes
+from .snowcrypt import decrypt_aaxc
 from .localExceptions import NotDecryptable, NotAnAudibleFile
 from .myparser import arg
 from .tinytag import MP4
