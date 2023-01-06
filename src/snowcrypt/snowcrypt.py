@@ -10,7 +10,7 @@ from typing import Tuple
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 
 from .localExceptions import CredentialMismatch, DecryptionFailure
-from .constants import *
+from .constants import *  # noqa
 
 
 fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
@@ -83,7 +83,7 @@ def _stsd_atom_handler(inStream, outStream, length, t, **_):
 
 def _aavd_atom_handler(inStream, outStream, length, t, atomPosition=None, **_):
     # change container name so MP4 readers don't complain
-    pack_into(fint[0], t.buf, atomPosition, MP4A)
+    pack_into(fint[0], t.buf, atomPosition, MP4A)  # noqa
     length -= t.write(outStream)
     outStream.write(inStream.read(length))
 
@@ -102,7 +102,7 @@ def _ftyp_writer(inStream, outStream, length, t, **_):
     length -= t.write(outStream)
     buf = bytearray(length)
     pos = 0
-    for tag in FTYP_TAGS:
+    for tag in FTYP_TAGS:  # noqa
         pack_into(fint[0], buf, pos, tag)
         pos += 4
     for i in range(24, length):
@@ -129,7 +129,7 @@ def _mdat_atom_handler(
     empty......   sum blk len   block count
     00 00 00 00   00 00 01 6c   00 00 01 6c ...
     the rest of the atom is an encrypted AAC audio sample with the above values
-    MDAT atoms may contain any number of AAVD atoms, each with the above description
+    MDAT atoms may contain any number of AAVD atoms
     """
     # this is the main work horse
     t.write(outStream)
@@ -151,9 +151,9 @@ def _mdat_atom_handler(
 
         # next come the atom specific fields
         # aavd has a list of sample sizes and then the samples.
-        if atom_type in [AAVD, MP4A]:
+        if atom_type in [AAVD, MP4A]:  # noqa
             # change t.buf's atom_type from AAVD to MP4A or vice versa
-            substitute_type = MP4A if atom_type == AAVD else AAVD
+            substitute_type = MP4A if atom_type == AAVD else AAVD  # noqa
             pack_into(fint[0], t.buf,  atomTypePosition, substitute_type)
 
             # sample sizes
@@ -175,17 +175,17 @@ def _mdat_atom_handler(
 
 
 _atomFuncs = {
-    FTYP: _ftyp_writer,
-    MDAT: _mdat_atom_handler,
-    AAVD: _aavd_atom_handler,
-    META: _meta_atom_handler,
-    STSD: _stsd_atom_handler,
-    MOOV: _default_atom_handler,
-    TRAK: _default_atom_handler,
-    MDIA: _default_atom_handler,
-    MINF: _default_atom_handler,
-    STBL: _default_atom_handler,
-    UDTA: _default_atom_handler,
+    FTYP: _ftyp_writer,  # noqa
+    MDAT: _mdat_atom_handler,  # noqa
+    AAVD: _aavd_atom_handler,  # noqa
+    META: _meta_atom_handler,  # noqa
+    STSD: _stsd_atom_handler,  # noqa
+    MOOV: _default_atom_handler,  # noqa
+    TRAK: _default_atom_handler,  # noqa
+    MDIA: _default_atom_handler,  # noqa
+    MINF: _default_atom_handler,  # noqa
+    STBL: _default_atom_handler,  # noqa
+    UDTA: _default_atom_handler,  # noqa
 }
 
 
@@ -276,17 +276,17 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
         tuple[str, str]: key, initialization vector
     """
     file_start = inStream.tell()
-    im_key = _sha(FIXEDKEY, bytes.fromhex(activation_bytes))
-    iv = _sha(FIXEDKEY, im_key, bytes.fromhex(activation_bytes), length=16)
+    im_key = _sha(FIXEDKEY, bytes.fromhex(activation_bytes))  # noqa
+    iv = _sha(FIXEDKEY, im_key, bytes.fromhex(activation_bytes), length=16)  # noqa
     key = im_key[:16]
 
     cipher = newAES(key, MODE_CBC, iv=iv)
-    inStream.seek(ADRM_START)
-    data = _pad_16(inStream.read(ADRM_LENGTH))
+    inStream.seek(ADRM_START)  # noqa
+    data = _pad_16(inStream.read(ADRM_LENGTH))  # noqa
     data = cipher.decrypt(data)
 
-    inStream.seek(CKSM_START)
-    real_checksum = inStream.read(CKSM_LENGTH)
+    inStream.seek(CKSM_START)  # noqa
+    real_checksum = inStream.read(CKSM_LENGTH)  # noqa
     derived_checksum = _sha(key, iv)
     validDrmChecksum = derived_checksum == real_checksum
 
@@ -298,7 +298,7 @@ def deriveKeyIV(inStream: BufferedReader, activation_bytes: str):
 
     fileKey = _key_mask(data)
     fileDrm = _drm_mask(data)
-    inVect = _sha(fileDrm, fileKey, FIXEDKEY, length=16)
+    inVect = _sha(fileDrm, fileKey, FIXEDKEY, length=16)  # noqa
     inStream.seek(file_start)
 
     return _bts(fileKey), _bts(inVect)
