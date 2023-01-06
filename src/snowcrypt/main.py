@@ -1,8 +1,10 @@
 import json
 import queue
 import threading
+import logging
 
 from os import path
+from datetime import datetime
 from typing import Tuple
 
 from .snowcrypt import decrypt_aaxc, key_and_iv_for_file_with_abytes
@@ -13,30 +15,29 @@ from .tinytag import MP4
 
 def main():
     class MyThreads(threading.Thread):
-
-        def __init__(self) -> None:
-            threading.Thread.__init__(self)
-
         def run(self):
-            eatTheQueen()
-
-    def eatTheQueen():
-        while not q.empty():
-            print("Eating a queen")
-            file = q.get()
-            decrypt_aaxc(*_get_args_for(file))
+            while not q.empty():
+                file = q.get()
+                logging.info(f"Starting: {file}")
+                then = datetime.now()
+                decrypt_aaxc(*_get_args_for(file))
+                now = datetime.now()
+                delta = now - then
+                if delta.seconds != 0:
+                    delta = delta.seconds
+                else:
+                    delta = delta.microseconds
+                logging.info(f"Finished: {file}. Total seconds: {delta}")
 
     q = queue.Queue()
     [q.put(file) for file in arg('input')]
 
-    threads = [MyThreads() for _ in range(8)]
+    threads = [MyThreads() for _ in range(arg('thread_count'))]
     for thread in threads:
         if not q.empty():
-            print("starting a thread")
             thread.start()
 
     for thread in threads:
-        print("joining a thread")
         thread.join() if thread.is_alive() else None
 
 
@@ -64,6 +65,9 @@ def determine_key_iv(
     inpath: str,
     activation_bytes: str | None = None,
 ) -> Tuple:
+    if arg('key') and arg('iv'):
+        return arg('key'), arg('iv')
+
     if isaax(inpath):
         activation_bytes = arg('bytes')
         if not activation_bytes:

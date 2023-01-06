@@ -18,16 +18,11 @@ add(
     default=None,
 )
 add(
-    '--encrypt',
-    action='store_true',
-    help='Convert TO aax(c) rather than FROM',
-)
-add(
     'input',
     action='store',
     nargs='+',
     type=str,
-    help='File to be converted',
+    help='File(s) to convert',
     default='',
 )
 add(
@@ -37,6 +32,14 @@ add(
     help='AES decryption initialization vector. '
     'Used instead of voucher or key derivation.',
     default=None
+)
+add(
+    '--jobs', '-j',
+    action='store',
+    dest='thread_count',
+    type=int,
+    default=8,
+    help='the number of parallel threads to use'
 )
 add(
     '--key', '-k',
