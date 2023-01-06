@@ -47,22 +47,6 @@ class Translator:
         return self.wpos
 
 
-def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
-    # setup
-    length = t.next(fint)
-    aes = newAES(key, MODE_CBC, iv=iv)
-
-    # for cipher padding, (up to) last 2 bytes are unencrypted
-    encryptedLength = length & 0xFFFFFFF0
-    unencryptedLength = length & 0x0000000F
-
-    encryptedData = inStream.read(encryptedLength)
-    unencryptedData = inStream.read(unencryptedLength)
-
-    data = aes.decrypt(encryptedData) + unencryptedData
-    return data
-
-
 class Handler:
     def meta(inStream, outStream, length, t, **_):
         t.readOne(fint, inStream)
@@ -177,6 +161,22 @@ _atomFuncs = {
 }
 
 
+def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
+    # setup
+    length = t.next(fint)
+    aes = newAES(key, MODE_CBC, iv=iv)
+
+    # for cipher padding, (up to) last 2 bytes are unencrypted
+    encryptedLength = length & 0xFFFFFFF0
+    unencryptedLength = length & 0x0000000F
+
+    encryptedData = inStream.read(encryptedLength)
+    unencryptedData = inStream.read(unencryptedLength)
+
+    data = aes.decrypt(encryptedData) + unencryptedData
+    return data
+
+
 def _atomizer(
     inStream: BufferedReader = None,
     outStream: BufferedWriter = None,
@@ -249,5 +249,11 @@ def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
     if not os.path.exists(inpath):
         raise FileNotFoundError(inpath)
 
-    key, iv = key_and_iv_for_file_with_abytes(inpath, activation_bytes)
-    decrypt_aaxc(inpath, outpath, key, iv)
+    decrypt_aaxc(
+        inpath,
+        outpath,
+        *key_and_iv_for_file_with_abytes(
+            inpath,
+            activation_bytes
+        )
+    )
