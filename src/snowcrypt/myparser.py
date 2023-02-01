@@ -1,5 +1,7 @@
 import argparse
 
+from ._version import __version__
+
 parser = argparse.ArgumentParser(description='Argument parser description')
 add = parser.add_argument
 add(
@@ -48,6 +50,10 @@ add(
     help='AES decryption key. Used instead of voucher or key derivation.',
     default=None
 )
+add('--version',
+    '-v',
+    action='version',
+    version='snowskeleton/snowcrypt ' + __version__)
 args, _ = parser.parse_known_args()
 
 
