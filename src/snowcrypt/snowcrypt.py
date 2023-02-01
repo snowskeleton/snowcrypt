@@ -191,7 +191,7 @@ def _atomizer(
         atomPosition = t.pos
         atomType = t.readOne(fint, inStream)
 
-        func = _atomFuncs.get(atomType, Handler._just_copy_it)
+        func = _atomFuncs.get(atomType, Handler.just_copy_it)
         func(
             atomEnd=atomStart + length,
             atomPosition=atomPosition,
