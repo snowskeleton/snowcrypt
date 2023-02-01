@@ -150,8 +150,6 @@ class Handler:
                 # flush buffer
                 t.write(outStream)
 
-                if block_count != 11:
-                    print(block_count)
                 for _ in range(block_count):
                     decrypted_block = _decrypt_aavd(inStream, key, iv, t)
                     outStream.write(decrypted_block)
