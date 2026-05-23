@@ -3,6 +3,8 @@ import json
 import queue
 import threading
 import logging
+import sys
+import re
 
 from os import path
 from datetime import datetime
@@ -59,6 +61,11 @@ def _get_args_for(file) -> list:
     tags = MP4.get(infile, encoding='MP4')
     title = tags.title.replace(' (Unabridged)', '')
     outfile = title + '.m4a'
+
+    #  Match Microsoft Windows reserved characters and control characters, replace
+    #  them with underline character ('_').
+    if sys.platform == 'win32':
+        outfile = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', outfile)
 
     return [infile, outfile, key, iv]
 
