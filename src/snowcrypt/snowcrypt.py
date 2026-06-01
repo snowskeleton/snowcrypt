@@ -12,6 +12,7 @@ from .localExceptions import DecryptionFailure
 
 
 fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
+fuint, fulong = (">I", 4), (">Q", 8)
 
 
 class Translator:
@@ -31,8 +32,8 @@ class Translator:
         return data
 
     def readAtomSize(self, inStream: BufferedReader) -> int:
-        atomLength = self.readOne(fint, inStream)
-        return atomLength if atomLength != 1 else self.readOne(flong, inStream)
+        atomLength = self.readOne(fuint, inStream)
+        return atomLength if atomLength != 1 else self.readOne(fulong, inStream)
 
     def readOne(self, format: tuple, inStream: BufferedReader):
         length = format[1]
@@ -49,7 +50,7 @@ class Translator:
 
 def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
     # setup
-    length = t.next(fint)
+    length = t.next(fuint)
     aes = newAES(key, MODE_CBC, iv=iv)
 
     # for cipher padding, (up to) last 2 bytes are unencrypted
@@ -134,8 +135,8 @@ class Handler:
             t.readOne(fint, inStream)
             t.readOne(fint, inStream)
             t.readOne(fint, inStream)
-            sum_block_length = t.readOne(fint, inStream)
-            block_count = t.readOne(fint, inStream)
+            sum_block_length = t.readOne(fuint, inStream)
+            block_count = t.readOne(fuint, inStream)
 
             # next come the atom specific fields
             # aavd has a list of sample sizes and then the samples.
