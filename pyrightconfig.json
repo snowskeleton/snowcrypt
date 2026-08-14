@@ -1,0 +1,15 @@
+{
+    "typeCheckingMode": "standard",
+    "include": [
+        "src"
+    ],
+    "exclude": [
+        "**/__pycache__",
+        "src/snowcrypt/tinytag.py",
+        "build",
+        "dist",
+        ".venv"
+    ],
+    "venvPath": ".",
+    "venv": ".venv"
+}

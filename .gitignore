@@ -7,6 +7,7 @@ secretStuff.py
 *.aa*
 *.voucher
 *.json
+!pyrightconfig.json
 *.html
 sync.sh
 

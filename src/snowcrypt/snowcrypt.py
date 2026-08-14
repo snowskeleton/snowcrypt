@@ -1,10 +1,12 @@
 # https://github.com/mkb79/Audible/issues/36, user BlindWanderer
+from __future__ import annotations
+
 import os
 from io import BufferedReader, BufferedWriter
 from math import isclose
 from struct import unpack_from, pack_into
 
-from Crypto.Cipher.AES import MODE_CBC, new as newAES
+from Crypto.Cipher.AES import MODE_CBC, new as newAES  # type: ignore
 
 from .adrm_key_derivation import key_and_iv_for_file_with_abytes
 from .constants import *  # noqa
@@ -16,32 +18,34 @@ fuint, fulong = (">I", 4), (">Q", 8)
 
 
 class Translator:
-    def __init__(self, size: int = None):
+    def __init__(self, size: int | None = None):
         self.buf = bytearray(size if size is not None else 4096)
         self.pos, self.wpos = 0, 0
 
-    def _readInto(self, inStream: BufferedReader, length: int or None) -> int:
+    def _readInto(self, inStream: BufferedReader, length: int) -> int:
         start = self.wpos
         self.buf[start:start + length] = inStream.read(length)
         self.wpos += length
         return length
 
-    def next(self, format: tuple):
+    def next(self, format: tuple[str, int]) -> int:
         data = unpack_from(format[0], self.buf, self.pos)[0]
         self.pos += format[1]
         return data
 
     def readAtomSize(self, inStream: BufferedReader) -> int:
         atomLength = self.readOne(fuint, inStream)
-        return atomLength if atomLength != 1 else self.readOne(fulong, inStream)
+        return atomLength if atomLength != 1 else self.readOne(
+            fulong, inStream)
 
-    def readOne(self, format: tuple, inStream: BufferedReader):
+    def readOne(self, format: tuple[str, int],
+                inStream: BufferedReader) -> int:
         length = format[1]
         self._readInto(inStream, length)
         r = self.next(format)
         return r
 
-    def write(self, out: BufferedWriter) -> int:
+    def write(self, out: "BufferedWriter | _ProgressWriter") -> int:
         end = self.wpos
         data = self.buf[0:end]
         out.write(data)
@@ -65,30 +69,36 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
 
 
 class Handler:
+    @staticmethod
     def meta(inStream, outStream, length, t, **_):
         t.readOne(fint, inStream)
         t.write(outStream)
         _atomizer(inStream, outStream, length)
 
+    @staticmethod
     def stsd(inStream, outStream, length, t, **_):
         t.readOne(flong, inStream)
         t.write(outStream)
         _atomizer(inStream, outStream, length)
 
-    def aavd(inStream, outStream, length, t, atomPosition=None, **_):
+    @staticmethod
+    def aavd(inStream, outStream, length, t, atomPosition: int, **_):
         # change container name so MP4 readers don't complain
         pack_into(fint[0], t.buf, atomPosition, MP4A)  # noqa
         length -= t.write(outStream)
         outStream.write(inStream.read(length))
 
+    @staticmethod
     def default(inStream, outStream, length, t, **_):
         t.write(outStream)
         _atomizer(inStream, outStream, length)
 
+    @staticmethod
     def just_copy_it(inStream, outStream, length, t, **_):
         length -= t.write(outStream)
         outStream.write(inStream.read(length))
 
+    @staticmethod
     def ftyp_writer(inStream, outStream, length, t, **_):
         length -= t.write(outStream)
         buf = bytearray(length)
@@ -101,13 +111,14 @@ class Handler:
         outStream.write(buf)
         inStream.read(length)
 
+    @staticmethod
     def mdat(
             inStream: BufferedReader,
-            outStream: BufferedWriter,
+            outStream: "BufferedWriter | _ProgressWriter",
             length: int,
             t: Translator,
+            atomEnd: int,
             encrypt: bool = False,
-            atomEnd: int = None,
             key=None,
             iv=None,
             ** _,
@@ -143,7 +154,7 @@ class Handler:
             if atom_type in [AAVD, MP4A]:  # noqa
                 # change t.buf's atom_type from AAVD to MP4A or vice versa
                 substitute_type = MP4A if atom_type == AAVD else AAVD  # noqa
-                pack_into(fint[0], t.buf,  atomTypePosition, substitute_type)
+                pack_into(fint[0], t.buf, atomTypePosition, substitute_type)
 
                 # sample sizes
                 t._readInto(inStream, block_count * 4)
@@ -177,9 +188,9 @@ _atomFuncs = {
 
 
 def _atomizer(
-    inStream: BufferedReader = None,
-    outStream: BufferedWriter = None,
-    eof: int = None,
+    inStream: BufferedReader,
+    outStream: "BufferedWriter | _ProgressWriter",
+    eof: int | None = None,
     key=None,
     iv=None,
     encrypt: bool = False,
@@ -246,7 +257,7 @@ class _ProgressWriter:
         return getattr(self._stream, name)
 
 
-def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int,
+def decrypt_aaxc(inpath: str, outpath: str, key: str, iv: str,
                  progress_callback=None,
                  progress_interval: int = 1024 * 1024):
     """converts inpath with key and iv, writing to outpath
@@ -254,8 +265,8 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int,
     Args:
         inpath (str): source
         outpath (str): destination
-        key (int): AES key
-        iv (int): AES initialization vector
+        key (str): AES key, as hex
+        iv (str): AES initialization vector, as hex
         progress_callback (callable): optional, called as
             `progress_callback(bytes_written, total_bytes)` as decryption
             proceeds. total_bytes is the size of the input file, which the
@@ -267,24 +278,25 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int,
     if not os.path.exists(inpath):
         raise FileNotFoundError(inpath)
 
-    key = bytes.fromhex(key)
-    iv = bytes.fromhex(iv)
+    key_bytes = bytes.fromhex(key)
+    iv_bytes = bytes.fromhex(iv)
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
-            sink = dest
+            reporter = None
             if progress_callback is not None:
-                sink = _ProgressWriter(
+                reporter = _ProgressWriter(
                     dest,
                     progress_callback,
                     os.path.getsize(inpath),
                     progress_interval,
                 )
+            sink = reporter if reporter is not None else dest
 
             _atomizer(
                 outStream=sink,
                 inStream=src,
-                key=key,
-                iv=iv,
+                key=key_bytes,
+                iv=iv_bytes,
             )
             s1 = os.path.getsize(src.name)
             s2 = os.path.getsize(dest.name)
@@ -297,8 +309,8 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int,
             # completed size, whatever the interval left unreported. Uses the
             # wrapper's own tally rather than the file size, which is measured
             # before the stream is flushed and can read short.
-            if progress_callback is not None:
-                progress_callback(sink.written, s1)
+            if progress_callback is not None and reporter is not None:
+                progress_callback(reporter.written, s1)
 
 
 def decrypt_aax(inpath: str, outpath: str, activation_bytes: str,

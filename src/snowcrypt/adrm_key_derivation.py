@@ -1,7 +1,7 @@
 from hashlib import sha1
 from io import BufferedReader
 from binascii import hexlify
-from typing import Tuple
+from typing import Optional, Tuple
 
 from Crypto.Cipher.AES import MODE_CBC, new as newAES
 
@@ -69,10 +69,10 @@ def _swapEndian(string: str):
     return "".join(map(str.__add__, string[-2::-2], string[-1::-2]))
 
 
-def _sha(*bits: bytes, length: int = None):
+def _sha(*bits: bytes, length: Optional[int] = None):
     return sha1(b''.join(bits)).digest()[:length]
 
 
 def _pad_16(data: bytes, length: int = 16) -> bytes:
     length = length - (len(data) % length)
-    return data + bytes([length])*length
+    return data + bytes([length]) * length
