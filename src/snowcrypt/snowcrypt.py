@@ -206,7 +206,49 @@ def _atomizer(
         )
 
 
-def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
+class _ProgressWriter:
+    """Wraps an output stream, reporting how much has been written.
+
+    Decryption of a full-length audiobook takes minutes, during which a caller
+    otherwise has no way to tell a slow decrypt from a hung one. Wrapping the
+    stream keeps the reporting in one place instead of threading a callback
+    through every atom handler.
+
+    The callback fires at most once per `interval` bytes, so a caller doing
+    something expensive (a database write, a UI update) isn't called once per
+    AAVD block.
+    """
+
+    def __init__(self, stream: BufferedWriter, callback, total: int,
+                 interval: int):
+        self._stream = stream
+        self._callback = callback
+        self._total = total
+        self._interval = max(1, interval)
+        self._written = 0
+        self._reported = 0
+
+    @property
+    def written(self) -> int:
+        """Bytes handed to the underlying stream so far."""
+        return self._written
+
+    def write(self, data) -> int:
+        written = self._stream.write(data)
+        self._written += written if written is not None else len(data)
+        if self._written - self._reported >= self._interval:
+            self._reported = self._written
+            self._callback(self._written, self._total)
+        return written
+
+    def __getattr__(self, name):
+        # Atom handlers use tell(), name, flush() and friends directly.
+        return getattr(self._stream, name)
+
+
+def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int,
+                 progress_callback=None,
+                 progress_interval: int = 1024 * 1024):
     """converts inpath with key and iv, writing to outpath
 
     Args:
@@ -214,6 +256,13 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
         outpath (str): destination
         key (int): AES key
         iv (int): AES initialization vector
+        progress_callback (callable): optional, called as
+            `progress_callback(bytes_written, total_bytes)` as decryption
+            proceeds. total_bytes is the size of the input file, which the
+            output closely tracks. Exceptions raised by the callback propagate
+            and abort the decryption.
+        progress_interval (int): minimum bytes written between callbacks.
+            Defaults to 1 MiB.
     """
     if not os.path.exists(inpath):
         raise FileNotFoundError(inpath)
@@ -222,8 +271,17 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
     iv = bytes.fromhex(iv)
     with open(inpath, 'rb') as src:
         with open(outpath, 'wb') as dest:
+            sink = dest
+            if progress_callback is not None:
+                sink = _ProgressWriter(
+                    dest,
+                    progress_callback,
+                    os.path.getsize(inpath),
+                    progress_interval,
+                )
+
             _atomizer(
-                outStream=dest,
+                outStream=sink,
                 inStream=src,
                 key=key,
                 iv=iv,
@@ -235,8 +293,17 @@ def decrypt_aaxc(inpath: str, outpath: str, key: int, iv: int):
                 msg += f'does not match "{src.name}" size of {s1}'
                 raise DecryptionFailure(msg)
 
+            # A final report so a caller watching this always sees the
+            # completed size, whatever the interval left unreported. Uses the
+            # wrapper's own tally rather than the file size, which is measured
+            # before the stream is flushed and can read short.
+            if progress_callback is not None:
+                progress_callback(sink.written, s1)
 
-def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
+
+def decrypt_aax(inpath: str, outpath: str, activation_bytes: str,
+                progress_callback=None,
+                progress_interval: int = 1024 * 1024):
     """convenience function for deriving AES key and initialization vector,
     then decrypting with those values.
 
@@ -244,9 +311,13 @@ def decrypt_aax(inpath: str, outpath: str, activation_bytes: str):
         inpath (str): file path to input
         outpath (str): file path to output
         activation_bytes (str): decryption bytes unique to your account
+        progress_callback (callable): optional, see :func:`decrypt_aaxc`
+        progress_interval (int): minimum bytes written between callbacks
     """
     if not os.path.exists(inpath):
         raise FileNotFoundError(inpath)
 
     key, iv = key_and_iv_for_file_with_abytes(inpath, activation_bytes)
-    decrypt_aaxc(inpath, outpath, key, iv)
+    decrypt_aaxc(inpath, outpath, key, iv,
+                 progress_callback=progress_callback,
+                 progress_interval=progress_interval)
