@@ -8,7 +8,7 @@ from Crypto.Cipher.AES import MODE_CBC, new as newAES
 
 from .adrm_key_derivation import key_and_iv_for_file_with_abytes
 from .constants import *  # noqa
-from .localExceptions import DecryptionFailure
+from .localExceptions import DecryptionFailure, TruncatedFile
 
 
 fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
@@ -59,6 +59,17 @@ def _decrypt_aavd(inStream: BufferedReader, key, iv, t: Translator):
 
     encryptedData = inStream.read(encryptedLength)
     unencryptedData = inStream.read(unencryptedLength)
+
+    # encryptedLength is masked to a 16-byte boundary, so a short read is the
+    # only way this can be misaligned, and it means the file ended mid-block.
+    # Say so: AES would otherwise raise a padding error that reads like a key
+    # problem and sends the caller looking in the wrong place entirely.
+    if len(encryptedData) != encryptedLength:
+        raise TruncatedFile(
+            f'expected {encryptedLength} bytes of encrypted audio at offset '
+            f'{inStream.tell() - len(encryptedData)}, got '
+            f'{len(encryptedData)}. The input file is incomplete.'
+        )
 
     data = aes.decrypt(encryptedData) + unencryptedData
     return data

@@ -16,3 +16,8 @@ class NotAnAudibleFile(SnowcryptException):
 
 class DecryptionFailure(SnowcryptException):
     pass
+
+
+class TruncatedFile(SnowcryptException):
+    """The input ended mid-block: it was cut short, not mis-keyed."""
+    pass
