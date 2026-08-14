@@ -49,7 +49,8 @@ import sys
 DEBUG = os.environ.get('DEBUG', False)
 
 
-class TinyTagException(LookupError):  # inherit LookupError for backwards compat
+class TinyTagException(
+        LookupError):  # inherit LookupError for backwards compat
     pass
 
 
@@ -97,7 +98,13 @@ class TinyTag(object):
         return self._image_data
 
     @classmethod
-    def get(cls, filename, tags=True, duration=True, image=False, ignore_errors=False,
+    def get(
+            cls,
+            filename,
+            tags=True,
+            duration=True,
+            image=False,
+            ignore_errors=False,
             encoding=None):
         try:  # cast pathlib.Path to str
             import pathlib
@@ -190,7 +197,8 @@ class TinyTag(object):
 
     @staticmethod
     def _unpad(s):
-        # strings in mp3 and asf *may* be terminated with a zero byte at the end
+        # strings in mp3 and asf *may* be terminated with a zero byte at the
+        # end
         return s.replace('\x00', '')
 
 
@@ -247,7 +255,8 @@ class MP4(TinyTag):
 
         @classmethod
         def parse_id3v1_genre(cls, data_atom):
-            # dunno why the genre is offset by -1 but that's how mutagen does it
+            # dunno why the genre is offset by -1 but that's how mutagen does
+            # it
             idx = struct.unpack('>H', data_atom[8:])[0] - 1
             if idx < len(ID3.ID3V1_GENRES):
                 return {'genre': ID3.ID3V1_GENRES[idx]}
@@ -299,7 +308,11 @@ class MP4(TinyTag):
             alac_atom.seek(6, os.SEEK_CUR)
             avg_br = struct.unpack('>I', alac_atom.read(4))[0] / 1000  # kbit/s
             sr = struct.unpack('>I', alac_atom.read(4))[0]
-            return {'channels': channels, 'samplerate': sr, 'bitrate': avg_br, 'bitdepth': bitdepth}
+            return {
+                'channels': channels,
+                'samplerate': sr,
+                'bitrate': avg_br,
+                'bitdepth': bitdepth}
 
         @classmethod
         def parse_mvhd(cls, data):
@@ -327,12 +340,14 @@ class MP4(TinyTag):
     # callables return {fieldname: value} which is updates the TinyTag.
     META_DATA_TREE = {b'moov': {b'udta': {b'meta': {b'ilst': {
         # see: http://atomicparsley.sourceforge.net/mpeg-4files.html
-        # and: https://metacpan.org/dist/Image-ExifTool/source/lib/Image/ExifTool/QuickTime.pm#L3093
+        # and:
+        # https://metacpan.org/dist/Image-ExifTool/source/lib/Image/ExifTool/QuickTime.pm#L3093
         b'\xa9ART': {b'data': Parser.make_data_atom_parser('artist')},
         b'\xa9alb': {b'data': Parser.make_data_atom_parser('album')},
         b'\xa9cmt': {b'data': Parser.make_data_atom_parser('comment')},
         # need test-data for this
-        # b'cpil':   {b'data': Parser.make_data_atom_parser('extra.compilation')},
+        # b'cpil':   {b'data':
+        # Parser.make_data_atom_parser('extra.compilation')},
         b'\xa9day': {b'data': Parser.make_data_atom_parser('year')},
         # need test-data for this
         b'\xa9des': {b'data': Parser.make_data_atom_parser('extra.description')},
@@ -344,7 +359,8 @@ class MP4(TinyTag):
         b'aART': {b'data': Parser.make_data_atom_parser('albumartist')},
         b'cprt': {b'data': Parser.make_data_atom_parser('extra.copyright')},
         # need test-data for this
-        # b'desc': {b'data': Parser.make_data_atom_parser('extra.description')},
+        # b'desc': {b'data':
+        # Parser.make_data_atom_parser('extra.description')},
         b'disk': {b'data': Parser.make_number_parser('disc', 'disc_total')},
         b'gnre': {b'data': Parser.parse_id3v1_genre},
         b'trkn': {b'data': Parser.make_number_parser('track', 'track_total')},
@@ -352,7 +368,8 @@ class MP4(TinyTag):
         # b'tmpo': {b'data': Parser.make_data_atom_parser('extra.bmp')},
     }}}}}
 
-    # see: https://developer.apple.com/library/mac/documentation/QuickTime/QTFF/QTFFChap3/qtff3.html
+    # see:
+    # https://developer.apple.com/library/mac/documentation/QuickTime/QTFF/QTFFChap3/qtff3.html
     AUDIO_DATA_TREE = {
         b'moov': {
             b'mvhd': Parser.parse_mvhd,
@@ -392,9 +409,16 @@ class MP4(TinyTag):
                 atom_header = fh.read(header_size)
                 continue
             if DEBUG:
-                stderr('%s pos: %d atom: %s len: %d' %
-                       (' ' * 4 * len(curr_path), fh.tell() - header_size, atom_type,
-                        atom_size + header_size))
+                stderr(
+                    '%s pos: %d atom: %s len: %d' %
+                    (' ' *
+                     4 *
+                     len(curr_path),
+                        fh.tell() -
+                        header_size,
+                        atom_type,
+                        atom_size +
+                        header_size))
             if atom_type in self.VERSIONED_ATOMS:  # jump atom version for now
                 fh.seek(4, os.SEEK_CUR)
             if atom_type in self.FLAGGED_ATOMS:  # jump atom flags for now
@@ -419,7 +443,8 @@ class MP4(TinyTag):
                 self._set_field('adrmBlob', fh.read(56))
                 fh.seek(4, os.SEEK_CUR)  # absolute position 0x28d
                 self._set_field('checksum', fh.read(20))
-            # if we can't figure out what to do with this atom, just skip it and move on
+            # if we can't figure out what to do with this atom, just skip it
+            # and move on
             else:
                 fh.seek(atom_size, os.SEEK_CUR)
             # check if we have reached the end of this branch:

@@ -14,7 +14,7 @@ class Translator:
     fshort, fint, flong = (">h", 2), (">i", 4), (">q", 8)
 
     def __init__(self, size=None):
-        self.buf = bytearray(size if size != None else 4096)
+        self.buf = bytearray(size if size is not None else 4096)
         self.pos, self.wpos = 0, 0
 
     def reset(self):
@@ -76,7 +76,7 @@ class Translator:
         return atomLength if atomLength != 1 else self.readLong(inStream)
 
     def zero(self, start=0, end=None):
-        if end == None:
+        if end is None:
             end = self.wpos
         for i in range(start, end):
             self.buf[i] = 0
@@ -88,7 +88,12 @@ class Translator:
 
 
 class AaxDecrypter:
-    def __init__(self, inStream: io.BufferedReader, outStream: io.BufferedWriter, key: str, iv: str):
+    def __init__(
+            self,
+            inStream: io.BufferedReader,
+            outStream: io.BufferedWriter,
+            key: str,
+            iv: str):
         self.key = bytes.fromhex(key)
         self.iv = bytes.fromhex(iv)
         self.inStream = inStream
@@ -98,7 +103,8 @@ class AaxDecrypter:
         inStream = self.inStream
         outStream = self.outStream
         startPosition = inStream.tell()
-        # It's illegal for mdat to contain atoms... but that didn't stop Audible! Not that any parsers care.
+        # It's illegal for mdat to contain atoms... but that didn't stop
+        # Audible! Not that any parsers care.
         while inStream.tell() < endPosition:
             # read an atom length.
             atomStart = inStream.tell()
@@ -131,7 +137,8 @@ class AaxDecrypter:
                     remaining = sampleLength - \
                         outStream.write(cipher.decrypt(
                             inStream.read(sampleLength & 0xFFFFFFF0)))
-                    # fun fact, the last few bytes of each sample aren't encrypted!
+                    # fun fact, the last few bytes of each sample aren't
+                    # encrypted!
                     if remaining > 0:
                         self.copy(inStream, remaining, outStream)
             else:
@@ -160,9 +167,9 @@ class AaxDecrypter:
             if atom == 0x66747970:  # ftyp-none
                 remaining = remaining - translator.write_and_reset(outStream)
                 len = translator.readInto(inStream, remaining)
-                translator.putInt(0,  0x4D344120)  # "M4A "
-                translator.putInt(4,  0x00000200)  # version 2.0?
-                translator.putInt(8,  0x69736F32)  # "iso2"
+                translator.putInt(0, 0x4D344120)  # "M4A "
+                translator.putInt(4, 0x00000200)  # version 2.0?
+                translator.putInt(8, 0x69736F32)  # "iso2"
                 translator.putInt(12, 0x4D344220)  # "M4B "
                 translator.putInt(16, 0x6D703432)  # "mp42"
                 translator.putInt(20, 0x69736F6D)  # "isom"
@@ -383,4 +390,4 @@ def _pad(data: bytes, length: int = 16) -> bytes:
         where N is len(data) modulus length
     """
     length = length - (len(data) % length)
-    return data + bytes([length])*length
+    return data + bytes([length]) * length

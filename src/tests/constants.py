@@ -9,7 +9,7 @@ def avg(list: list):
             list.pop(0)
             list.pop(-1)
         s = max(list)
-        list = [float(i)/s for i in list]
+        list = [float(i) / s for i in list]
         return sum(list) / len(list)
     except ZeroDivisionError:
         return 0
