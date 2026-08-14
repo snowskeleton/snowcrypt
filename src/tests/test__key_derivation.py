@@ -52,5 +52,6 @@ def create_test_file(activation_bytes: str) -> BytesIO:
     file.write(_sha(true_key, true_iv))
     return file
 
+
 if __name__ == '__main__':
     unittest.main()
